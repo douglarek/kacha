@@ -1,0 +1,29 @@
+{
+  "name": "Kacha",
+  "slug": "kacha",
+  "identifier": "vibe.kacha",
+  "version": "0.1.0",
+  "copyright": "© 2026 Leo Douglas",
+  "publisher": "Leo Douglas",
+  "icon": "resources/icon.png",
+  "out": "dist",
+  "linux": {
+    "maintainer": "Leo Douglas <douglarek@gmail.com>",
+    "comment": "Capture the screen, annotate it, and copy it to the clipboard",
+    "categories": [
+      "Graphics",
+      "Utility"
+    ],
+    "webview": false,
+    "command": "kacha",
+    "depends": [
+      "wl-clipboard",
+      "xdg-desktop-portal"
+    ]
+  },
+  "macos": {},
+  "i18n": {
+    "dir": "locales",
+    "source": "en"
+  }
+}

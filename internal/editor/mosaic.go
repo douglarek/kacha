@@ -1,0 +1,91 @@
+package editor
+
+import (
+	"image"
+	"image/color"
+	"math"
+
+	"github.com/egoist/mygo/ui"
+)
+
+// Block is the side, in capture pixels, of the squares a Mosaic paints.
+const Block = 12
+
+// Mosaic is the pixelated copy of a capture that the mosaic tool stamps.
+type Mosaic struct {
+	Bitmap *ui.Bitmap
+	// Block is the side of one square in pixels of the capture.
+	Block float32
+}
+
+// NewMosaic returns the copy of img the mosaic tool paints, made of
+// Block×Block squares.
+func NewMosaic(img image.Image) *Mosaic {
+	return &Mosaic{Bitmap: ui.NewBitmap(Pixelate(img, Block)).Pixelated(), Block: Block}
+}
+
+// Stamp draws the pixels of the mosaic under pts, a brush of radius r.
+// Squares snap to the grid of the whole capture, so stamps that overlap
+// line up.
+func (m *Mosaic) Stamp(p *ui.Painter, pts []image.Point, r float32) {
+	if m == nil || m.Bitmap == nil || m.Block <= 0 {
+		return
+	}
+	r = max(r, m.Block/2)
+	var last image.Rectangle
+	for i, pt := range pts {
+		src := m.rectAt(pt, r)
+		if i > 0 && src == last {
+			continue
+		}
+		last = src
+		dst := ui.Rect{
+			X: float32(src.Min.X), Y: float32(src.Min.Y),
+			W: float32(src.Dx()), H: float32(src.Dy()),
+		}
+		p.ImageRegion(m.Bitmap, ui.Rect{
+			X: float32(src.Min.X) / m.Block, Y: float32(src.Min.Y) / m.Block,
+			W: float32(src.Dx()) / m.Block, H: float32(src.Dy()) / m.Block,
+		}, dst, ui.ImageOptions{})
+	}
+}
+
+// rectAt returns the squares the brush at pt covers, on the grid.
+func (m *Mosaic) rectAt(pt image.Point, r float32) image.Rectangle {
+	b := float64(m.Block)
+	return image.Rect(
+		int(math.Floor((float64(pt.X)-float64(r))/b))*int(m.Block),
+		int(math.Floor((float64(pt.Y)-float64(r))/b))*int(m.Block),
+		int(math.Ceil((float64(pt.X)+float64(r))/b))*int(m.Block),
+		int(math.Ceil((float64(pt.Y)+float64(r))/b))*int(m.Block),
+	)
+}
+
+// Pixelate returns img as block×block squares of its average color.
+func Pixelate(img image.Image, block int) *image.RGBA {
+	bounds := img.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+	out := image.NewRGBA(image.Rect(0, 0, max(w/block, 1), max(h/block, 1)))
+	for by := range out.Bounds().Dy() {
+		for bx := range out.Bounds().Dx() {
+			var r, g, b, a, n uint64
+			for y := by * block; y < (by+1)*block && y < h; y++ {
+				for x := bx * block; x < (bx+1)*block && x < w; x++ {
+					pr, pg, pb, pa := img.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
+					r += uint64(pr >> 8)
+					g += uint64(pg >> 8)
+					b += uint64(pb >> 8)
+					a += uint64(pa >> 8)
+					n++
+				}
+			}
+			if n == 0 {
+				continue
+			}
+			out.Set(bx, by, color.RGBA{
+				R: uint8(r / n), G: uint8(g / n), B: uint8(b / n), A: uint8(a / n),
+			})
+		}
+	}
+	return out
+}

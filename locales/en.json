@@ -1,0 +1,77 @@
+{
+  "@@locale": "en",
+  "hint": "Drag to select · Esc to cancel",
+  "@hint": {
+    "description": "The line over the capture, before a part is picked."
+  },
+  "toolRectangle": "Rectangle",
+  "toolEllipse": "Ellipse",
+  "toolArrow": "Arrow",
+  "toolPen": "Pen",
+  "toolText": "Text",
+  "toolMosaic": "Mosaic",
+  "colorRed": "Red",
+  "colorOrange": "Orange",
+  "colorYellow": "Yellow",
+  "colorGreen": "Green",
+  "colorBlue": "Blue",
+  "shapeColor": "{color} shapes",
+  "@shapeColor": {
+    "description": "The tip of a color swatch.",
+    "placeholders": {
+      "color": {
+        "type": "String",
+        "example": "Red"
+      }
+    }
+  },
+  "strokeThin": "Thin",
+  "strokeMedium": "Medium",
+  "strokeThick": "Thick",
+  "strokeTip": "{name} stroke, {width} pt",
+  "@strokeTip": {
+    "description": "The tip of a stroke width button.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Thin"
+      },
+      "width": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "commandUndo": "Undo",
+  "commandRedo": "Redo",
+  "commandCancel": "Cancel, discards the capture",
+  "commandSave": "Save a PNG file",
+  "commandCopy": "Copy to the clipboard",
+  "captureFailed": "Kacha could not capture the screen",
+  "toolNumber": "Number",
+  "toolCrop": "Crop",
+  "settingsTitle": "Settings",
+  "settingsLaunchAtLogin": "Open at login",
+  "settingsShortcut": "Shortcut",
+  "settingsPressKeys": "Press keys…",
+  "settingsShortcutHint": "Press it anywhere to take a capture.",
+  "settingsMenu": "Settings…",
+  "trayCapture": "Capture",
+  "settingsLaunchAtLoginHint": "Open Kacha when you log in, ready for the shortcut.",
+  "settingsPressKeysHint": "Press the keys you want, or Escape to keep the one you have.",
+  "settingsCancelShortcut": "Keep the shortcut",
+  "trayReadyTitle": "Kacha is in the tray",
+  "trayReadyBody": "Press {keys} to take a capture, or right-click the tray icon for its settings.",
+  "@trayReadyBody": {
+    "description": "The balloon a first launch shows.",
+    "placeholders": {
+      "keys": {
+        "type": "String",
+        "example": "Ctrl+Shift+S"
+      }
+    }
+  },
+  "stripMenuBar": "Menu Bar",
+  "stripDock": "Dock",
+  "stripTaskbar": "Taskbar"
+}

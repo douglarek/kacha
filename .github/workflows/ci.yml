@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Linux runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-0t64 ||
+            sudo apt-get install -y --no-install-recommends libgtk-3-0
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # The race detector needs cgo, which Windows runners have no compiler
+      # for by default.
+      - name: Test
+        if: runner.os != 'Windows'
+        run: go test -race -count=1 ./...
+
+      - name: Test
+        if: runner.os == 'Windows'
+        shell: bash
+        run: go test -count=1 ./...
+
+      - name: Check the version
+        shell: bash
+        run: |
+          py=$(command -v python3 || command -v python)
+          want=$("$py" -c 'import json; print(json.load(open("mygo.json"))["version"])')
+          got=$(go run . version | awk '{print $2}')
+          if [ "$want" != "$got" ]; then
+            echo "kacha reports $got, and mygo.json says $want" >&2
+            exit 1
+          fi
+
+      - name: Vulnerability scan
+        if: runner.os == 'Linux'
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

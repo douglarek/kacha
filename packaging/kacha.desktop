@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Kacha
+GenericName=Screenshot
+Comment=Capture the screen and copy it to the clipboard
+Exec=kacha region
+Icon=accessories-screenshot
+Terminal=false
+Categories=Graphics;Utility;
+Keywords=screenshot;capture;shot;snip;
+StartupNotify=false
+StartupWMClass=kacha

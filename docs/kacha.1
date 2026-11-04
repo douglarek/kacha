@@ -1,0 +1,116 @@
+.TH KACHA 1 "2026-11-03" "kacha 0.1.0" "User Commands"
+.SH NAME
+kacha \- capture the screen on Linux and macOS
+.SH SYNOPSIS
+.B kacha
+[\fBregion\fR|\fBfull\fR|\fBarea \fIX,Y,WxH\fR|\fBversion\fR]
+[\fIflags\fR]
+.SH DESCRIPTION
+.B kacha
+captures the screen, lets the user drag a part of it, annotates what they
+picked, and copies the result to the clipboard and to the disk.
+.PP
+It captures Wayland sessions through \fForg.freedesktop.portal.Screenshot\fR,
+and macOS through \fBscreencapture\fR. X11 is not supported.
+.PP
+On Wayland it copies through \fBwl-copy\fR when wl-clipboard is installed:
+that leaves a process of its own serving the selection, so a capture stays
+pasteable after \fBkacha\fR exits. Without it the capture goes through GTK,
+and a desktop with no clipboard manager, as COSMIC, empties the clipboard
+when the copying process ends.
+.SH COMMANDS
+.TP
+.B region
+Capture the screen, show the captured frame full screen, and take the part
+the user drags. What was picked then shows in the editor, with a toolbar
+under it. Enter or a double click finishes, Escape or a right click cancels.
+This is the default.
+.TP
+.B full
+Capture the display under the pointer without a selection window.
+.TP
+.BI area " X,Y,WxH"
+Capture a rectangle of the display under the pointer, in device independent
+pixels from its top left corner.
+.TP
+.B permission
+Ask the system for what a capture needs. On macOS that is the screen
+recording permission of this copy, which shows its dialog once.
+.TP
+.B version
+Print the version.
+.SH EDITOR
+The toolbar holds eight tools: rectangle, ellipse, arrow, pen, text, number,
+mosaic and crop; five colors; three stroke widths; undo and redo; and three
+buttons that end the capture: cancel, save to a file, and copy to the
+clipboard.
+.PP
+A text is typed with the system's input method and settled with Enter or a
+press elsewhere; the field it is typed in shows the capture through, so that
+the text lands where it is meant to. A text already drawn is picked by a
+click, and the drag that follows moves it; a double click opens it again, and
+Escape leaves it as it was. A number is placed with a click, and counts on
+from the numbers before it. A drag with the crop keeps the part of the
+capture it covers, and drops the rest, the shapes moving with it. Dragging a
+corner or a side of the selection resizes what is kept as well.
+.TP
+.B Enter
+Keep the capture and copy it to the clipboard, as a double click does.
+.TP
+.B "Cmd+Z, Cmd+Shift+Z"
+Undo and redo a shape. Cmd is Command on macOS and Control elsewhere.
+.TP
+.B Escape
+Leave without a capture.
+.SH FLAGS
+.TP
+.BI \-o ", " \-\-out " PATH"
+Write the capture at PATH, which names a file or a directory, and turn
+saving on. Defaults to \fB$KACHA_DIR\fR, else
+\fB~/Pictures/Screenshots\fR, and names the file after the moment of the
+capture.
+.TP
+.B \-\-stdout
+Write the PNG to standard output instead of saving and copying; only the
+\fBfull\fR command takes it.
+.TP
+.BI \-\-copy= BOOL
+Copy the capture to the clipboard. True by default: a capture goes to the
+clipboard unless a flag or a button asks for a file.
+.TP
+.BI \-\-save= BOOL
+Write the capture to the disk. False by default, and on when \fB\-\-out\fR
+names where to write.
+.TP
+.BI \-\-delay " D"
+Wait D, as 1.5s, before capturing.
+.SH ENVIRONMENT
+.TP
+.B KACHA_DIR
+Where captures go unless \fB\-\-out\fR says otherwise.
+.TP
+.B KACHA_SOURCE
+Take the capture from a PNG file instead of the screen, to try the selection
+window where nothing can be captured.
+.SH EXIT STATUS
+.TP
+.B 0
+A capture was taken and delivered.
+.TP
+.B 1
+An error, printed to standard error.
+.TP
+.B 130
+The user canceled the selection.
+.SH EXAMPLES
+.PP
+.nf
+# A keybinding, here in a wlroots compositor's configuration
+bindsym $mod+Shift+s exec kacha
+# Save a fixed rectangle, no window, no clipboard
+kacha area 0,0,1920x1080 --copy=false -o ~/tmp/
+# Straight into a pipe
+kacha full --stdout > shot.png
+.fi
+.SH SEE ALSO
+.BR screencapture (1)
