@@ -5,6 +5,7 @@ package settings
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -64,6 +65,11 @@ func loginService() (uintptr, error) {
 	loginOnce.Do(loadLogin)
 	if loginErr != nil {
 		return 0, loginErr
+	}
+	// A binary that no bundle holds has no login item to register: the
+	// service answers for the app it belongs to, and a test is none.
+	if os.Getenv("__CFBundleIdentifier") == "" {
+		return 0, errors.New("login item: the app is not a bundle")
 	}
 	class := loginCls(loginCString("SMAppService"))
 	if class == 0 {

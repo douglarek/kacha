@@ -45,13 +45,16 @@ func Save(s Settings) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(path(), append(data, '\n'), 0o644); err != nil {
-		return err
-	}
-	if LaunchAtLogin() == s.LaunchAtLogin {
+	return os.WriteFile(path(), append(data, '\n'), 0o644)
+}
+
+// SyncLoginItem puts the login item where the settings say, and does nothing
+// where it is there already.
+func SyncLoginItem(on bool) error {
+	if LaunchAtLogin() == on {
 		return nil
 	}
-	return SetLaunchAtLogin(s.LaunchAtLogin)
+	return SetLaunchAtLogin(on)
 }
 
 // path returns the file the settings live in.

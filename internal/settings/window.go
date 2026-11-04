@@ -18,6 +18,10 @@ var Logf = func(format string, any ...any) {}
 // so that its keys reach the window.
 var stopShortcut = func() { mygo.GlobalShortcut.UnregisterAll() }
 
+// syncLoginItem puts the login item where the settings say, which the tests
+// leave to the system they run on.
+var syncLoginItem = SyncLoginItem
+
 var (
 	mu        sync.Mutex
 	win       *mygo.Window
@@ -231,6 +235,9 @@ func shortcutKeys(accelerator string) string {
 // save writes the settings, and hands them to the app.
 func save() {
 	if err := Save(value); err != nil {
+		Logf("settings: %v", err)
+	}
+	if err := syncLoginItem(value.LaunchAtLogin); err != nil {
 		Logf("settings: %v", err)
 	}
 	if onApply != nil {
