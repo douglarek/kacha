@@ -282,6 +282,13 @@ func gui(o options) error {
 	overlay.Logf = logf
 	settings.Logf = logf
 	logf("start docked=%v alone=%v args=%v", docked(), openedAlone(), os.Args[1:])
+	// A tool of the menu bar takes no place in the Dock, and, what matters,
+	// comes forward for no capture it has not taken yet: an app that is
+	// front when the screen is captured hides the panels of the one it
+	// replaced, and they would be missing from the capture.
+	if runtime.GOOS == "darwin" {
+		mygo.App.SetActivationPolicy(mygo.ActivationPolicyAccessory)
+	}
 	// Opened on its own, with no arguments at all, the app stays in the
 	// tray of Windows, as the app of macOS does. A shell that wants a
 	// capture names one: kacha region, kacha full, kacha area.
