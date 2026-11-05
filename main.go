@@ -347,6 +347,10 @@ func resident(o options) error {
 				mygo.Dialog.Error(locales.CaptureFailed(), err.Error())
 			}
 			logf("capture done")
+			// The capture, its frames and the image they show are large and
+			// done with: what their memory was, the system gets back now
+			// rather than at the pace its collector chooses.
+			debug.FreeOSMemory()
 		}()
 	}
 	prefs := settings.Load()
