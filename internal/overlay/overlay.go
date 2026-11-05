@@ -743,7 +743,15 @@ func (s *selector) finish(img image.Image, choice Choice, err error) {
 	s.results <- err
 	if s.win != nil {
 		s.win.Close()
+		s.win = nil
 	}
+	// The capture and its frames are large, and spent: the app that stays
+	// for the next one should not keep them.
+	s.o.Image = nil
+	s.bitmap = nil
+	s.crop = nil
+	s.mosaic = nil
+	s.done = nil
 }
 
 // textField shows the field a text annotation is typed into.
