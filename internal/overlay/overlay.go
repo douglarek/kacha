@@ -207,7 +207,23 @@ type selector struct {
 	finished bool
 }
 
+// asRGBA returns img as the premultiplied RGBA whose pixels mygo shows as
+// they are: it copies any other image, so the capture goes as one, and the
+// window and the app share its pixels instead of holding one copy each.
+func asRGBA(img image.Image) image.Image {
+	if rgba, ok := img.(*image.RGBA); ok && rgba.Bounds().Min == (image.Point{}) && rgba.Stride == 4*rgba.Bounds().Dx() {
+		return rgba
+	}
+	b := img.Bounds()
+	out := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(out, out.Bounds(), img, b.Min, draw.Src)
+	return out
+}
+
 func newSelector(o Options, done func(image.Image, Choice) error) *selector {
+	if o.Image != nil {
+		o.Image = asRGBA(o.Image)
+	}
 	return &selector{
 		o:        o,
 		bitmap:   ui.NewBitmap(o.Image),

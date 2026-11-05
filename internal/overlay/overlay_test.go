@@ -651,3 +651,30 @@ func TestResizingKeepsAnnotationsInPlace(t *testing.T) {
 		t.Errorf("crop width = %d, want 320", s.crop.Bounds().Dx())
 	}
 }
+
+// TestTheCaptureGoesAsAnRGBA covers the copy mygo would make: it shows the
+// pixels of an RGBA as they are, and copies any other kind of image, which
+// the capture avoids by going as one.
+func TestTheCaptureGoesAsAnRGBA(t *testing.T) {
+	picture := image.NewNRGBA(image.Rect(0, 0, 4, 3))
+	picture.SetNRGBA(1, 1, color.NRGBA{R: 10, G: 20, B: 30, A: 255})
+
+	got, ok := asRGBA(picture).(*image.RGBA)
+	if !ok {
+		t.Fatalf("asRGBA gave %T, want *image.RGBA", asRGBA(picture))
+	}
+	if got.Bounds() != image.Rect(0, 0, 4, 3) {
+		t.Errorf("bounds = %v, want the picture's", got.Bounds())
+	}
+	if got.Stride != 4*4 {
+		t.Errorf("stride = %d, want 16, which mygo shows without a copy", got.Stride)
+	}
+	if r, g, b, a := got.At(1, 1).RGBA(); r>>8 != 10 || g>>8 != 20 || b>>8 != 30 || a>>8 != 255 {
+		t.Errorf("pixel = %d,%d,%d,%d, want 10,20,30,255", r>>8, g>>8, b>>8, a>>8)
+	}
+
+	rgba := image.NewRGBA(image.Rect(0, 0, 4, 3))
+	if again := asRGBA(rgba); again != image.Image(rgba) {
+		t.Error("an RGBA was copied too")
+	}
+}
