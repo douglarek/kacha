@@ -1,5 +1,6 @@
 {
   "@@locale": "en",
+  "appName": "Kacha",
   "hint": "Drag to select · Esc to cancel",
   "@hint": {
     "description": "The line over the capture, before a part is picked."

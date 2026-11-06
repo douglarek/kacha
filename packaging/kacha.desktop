@@ -1,8 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=Kacha
+Name[zh_CN]=咔嚓
 GenericName=Screenshot
+GenericName[zh_CN]=截图
 Comment=Capture the screen and copy it to the clipboard
+Comment[zh_CN]=截取屏幕并复制到剪贴板
 Exec=kacha region
 Icon=accessories-screenshot
 Terminal=false

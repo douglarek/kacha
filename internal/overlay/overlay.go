@@ -80,7 +80,7 @@ func Select(o Options, done func(image.Image, Choice) error) error {
 func run(s *selector) error {
 	o := s.o
 	w := mygo.NewWindow(mygo.WindowOptions{
-		Title:           "Kacha",
+		Title:           locales.AppName(),
 		Frameless:       true,
 		AlwaysOnTop:     true,
 		SkipTaskbar:     true,

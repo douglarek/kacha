@@ -1,5 +1,8 @@
 {
   "@@locale": "zh-Hans",
+  "appName": "咔嚓",
+  "mygo.appName": "咔嚓",
+  "mygo.appDescription": "截屏、标注，然后复制到剪贴板",
   "hint": "拖拽选区 · Esc 取消",
   "toolRectangle": "矩形",
   "toolEllipse": "椭圆",

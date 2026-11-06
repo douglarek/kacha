@@ -34,6 +34,16 @@ type Messages struct{ locale string }
 // source language.
 func In(locale string) Messages { return Messages{locale} }
 
+// AppName says "Kacha"
+// in the language the app shows.
+func AppName() string { return In(i18n.Locale()).AppName() }
+
+// AppName says "Kacha"
+// in the language of msgs.
+func (msgs Messages) AppName() string {
+	return Catalog.Format(msgs.locale, "appName", nil)
+}
+
 // Hint says "Drag to select · Esc to cancel"
 // in the language the app shows.
 //

@@ -384,7 +384,7 @@ func resident(o options) error {
 		if _, err := mygo.NewTray(mygo.TrayOptions{
 			Icon:           trayIcon(),
 			IconIsTemplate: trayIsTemplate(),
-			ToolTip:        "Kacha",
+			ToolTip:        locales.AppName(),
 			Menu: mygo.NewMenu([]*mygo.MenuItem{
 				{Label: locales.TrayCapture(), Click: func(*mygo.MenuItem, *mygo.Window) { capture() }},
 				{Label: locales.SettingsMenu(), Click: func(*mygo.MenuItem, *mygo.Window) { settings.Show(apply) }},
