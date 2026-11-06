@@ -98,11 +98,11 @@ func (msgs Messages) ToolText() string {
 	return Catalog.Format(msgs.locale, "toolText", nil)
 }
 
-// ToolMosaic says "Mosaic"
+// ToolMosaic says "Mosaic: drag to paint, Shift covers a region"
 // in the language the app shows.
 func ToolMosaic() string { return In(i18n.Locale()).ToolMosaic() }
 
-// ToolMosaic says "Mosaic"
+// ToolMosaic says "Mosaic: drag to paint, Shift covers a region"
 // in the language of msgs.
 func (msgs Messages) ToolMosaic() string {
 	return Catalog.Format(msgs.locale, "toolMosaic", nil)

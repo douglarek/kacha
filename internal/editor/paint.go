@@ -44,6 +44,8 @@ func paintShape(p *ui.Painter, s Shape, mosaic *Mosaic) {
 			p.Text(float32(s.Pts[0].X), float32(s.Pts[0].Y), s.Text, s.Width, s.Color)
 		}
 	case KindMosaic:
+		mosaic.Cover(p, s.Rect())
+	case KindMosaicBrush:
 		mosaic.Stamp(p, s.Pts, s.Width)
 	case KindBadge:
 		paintBadge(p, s)

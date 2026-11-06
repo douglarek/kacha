@@ -283,9 +283,78 @@ func TestToolbarUndo(t *testing.T) {
 	}
 }
 
-func TestMosaicChangesTheCapture(t *testing.T) {
+func TestShiftDragCoversTheRegion(t *testing.T) {
 	var got image.Image
 	s, tt := open(t, func(img image.Image, _ Choice) error { got = img; return nil })
+	selectArea(t, tt)
+	s.tool = editor.KindMosaic
+	s.shift = true
+
+	// A drag with Shift held, which the tester cannot hold down for a move.
+	s.beginShape(ui.Point{X: 150, Y: 150})
+	s.extendShape(ui.Point{X: 250, Y: 220})
+	s.commitShape()
+
+	shapes := s.board.Shapes()
+	if len(shapes) != 1 {
+		t.Fatalf("board holds %d shapes, want the box", len(shapes))
+	}
+	if shapes[0].Kind != editor.KindMosaic {
+		t.Errorf("the drag drew a %v, want a mosaic", shapes[0].Kind)
+	}
+	// Two capture pixels a DIP, from the selection's corner at 100,100.
+	if box, want := shapes[0].Rect(), image.Rect(100, 100, 300, 240); box != want {
+		t.Errorf("the box is %v, want %v", box, want)
+	}
+
+	tt.Move(120, 120)
+	tt.Key(0, ui.KeyEnter)
+	if got == nil {
+		t.Fatal("nothing was delivered")
+	}
+	// The squares grow past the box to the grid of the capture.
+	if !squares(got, image.Rect(96, 96, 300, 240)) {
+		t.Error("the mosaic left the capture's own pixels inside the box")
+	}
+	if squares(got, image.Rect(320, 260, 400, 300)) {
+		t.Error("the mosaic reached past the box")
+	}
+}
+
+func TestTheMosaicFrameFollowsTheDrag(t *testing.T) {
+	s, tt := open(t, nil)
+	selectArea(t, tt)
+	s.tool = editor.KindMosaic
+	s.shift = true
+
+	s.beginShape(ui.Point{X: 150, Y: 150})
+	s.extendShape(ui.Point{X: 250, Y: 220})
+
+	area := s.mosaic.Area(s.draft)
+	x0, y0 := s.toWindow(area.Min)
+	x1, _ := s.toWindow(area.Max)
+	// A pointer move draws the frame the draft is in.
+	tt.Move(120, 120)
+	if !isAccent(tt.Image().At(int((x0+x1)/2), int(y0))) {
+		t.Error("the box being dragged has no frame")
+	}
+
+	s.commitShape()
+	tt.Move(130, 130)
+	if isAccent(tt.Image().At(int((x0+x1)/2), int(y0))) {
+		t.Error("the frame stayed after the drag")
+	}
+}
+
+// isAccent reports whether c is the green the selection and the frames of the
+// mosaics are drawn in.
+func isAccent(c color.Color) bool {
+	r, g, b, _ := c.RGBA()
+	return r>>8 < 90 && g>>8 > 150 && b>>8 < 130
+}
+
+func TestDraggingPaintsWithTheBrush(t *testing.T) {
+	s, tt := open(t, nil)
 	selectArea(t, tt)
 
 	button, ok := s.bar.Tool(editor.KindMosaic)
@@ -295,14 +364,22 @@ func TestMosaicChangesTheCapture(t *testing.T) {
 	tt.ClickAt(button.Rect.X+button.Rect.W/2, button.Rect.Y+button.Rect.H/2)
 	tt.Press(150, 150)
 	tt.Move(200, 180)
-	tt.Release(200, 180)
+	tt.Move(250, 200)
+	tt.Release(250, 200)
 
-	tt.Key(0, ui.KeyEnter)
-	if got == nil {
-		t.Fatal("nothing was delivered")
+	shapes := s.board.Shapes()
+	if len(shapes) != 1 {
+		t.Fatalf("board holds %d shapes, want the brush's", len(shapes))
 	}
-	if !hasPatch(got) {
-		t.Error("the mosaic left no squares in the delivered image")
+	if shapes[0].Kind != editor.KindMosaicBrush {
+		t.Fatalf("the drag drew a %v, want a brush stroke", shapes[0].Kind)
+	}
+	if len(shapes[0].Pts) < 3 {
+		t.Errorf("the trail is %d points, want it to follow the pointer", len(shapes[0].Pts))
+	}
+	// The brush is four times the stroke width the toolbar shows.
+	if want := s.width * s.scale() * 4; shapes[0].Width != want {
+		t.Errorf("the brush is %g wide, want the %g it stands for", shapes[0].Width, want)
 	}
 }
 
@@ -461,25 +538,22 @@ func hasRed(img image.Image) bool {
 	return false
 }
 
-// hasPatch reports whether img holds squares of a single color, as a mosaic
-// leaves.
-func hasPatch(img image.Image) bool {
-	b := img.Bounds()
-	// A vertical run of the same color is what a mosaic's squares make.
-	same := 0
-	prev := img.At(b.Min.X, b.Min.Y)
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		cur := img.At(b.Min.X, y)
-		if cur == prev {
-			same++
-			if same > editor.Block {
-				return true
+// squares reports whether every Block×Block square of img inside r is one
+// color, as the squares of a mosaic are.
+func squares(img image.Image, r image.Rectangle) bool {
+	r = r.Intersect(img.Bounds())
+	if r.Empty() {
+		return false
+	}
+	block := editor.Block
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			if img.At(x, y) != img.At(x-x%block, y-y%block) {
+				return false
 			}
-		} else {
-			same, prev = 0, cur
 		}
 	}
-	return false
+	return true
 }
 
 // writePNG writes img at path.

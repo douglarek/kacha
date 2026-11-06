@@ -173,6 +173,9 @@ type selector struct {
 	color  ui.Color
 	width  float32
 	bar    editor.Bar
+	// shift is whether Shift was held as the frame read the pointer: a
+	// mosaic drag paints along it, and one that holds Shift covers a region.
+	shift bool
 
 	// round is the corner radius, in DIPs, of the window the selection came
 	// from, 0 for a selection the user dragged.
@@ -295,6 +298,7 @@ func (s *selector) view(c *ui.Context) {
 		s.commit(ChoiceCopyOnly)
 		return
 	}
+	s.shift = c.Modifiers()&ui.Shift != 0
 	if s.phase == phaseSelect {
 		s.trackSelection(root)
 	} else {
@@ -648,16 +652,20 @@ func (s *selector) beginShape(pt ui.Point) {
 		return
 	}
 	s.drafting = true
-	width := s.width * s.scale()
-	if s.tool == editor.KindMosaic {
-		// The mosaic is a brush wider than a stroke, as the eraser is.
-		width *= 4
-	}
 	s.draft = editor.Shape{
 		Kind:  s.tool,
 		Color: s.color,
-		Width: width,
 		Pts:   []image.Point{at, at},
+	}
+	switch {
+	case s.tool != editor.KindMosaic:
+		s.draft.Width = s.width * s.scale()
+	case !s.shift:
+		// A mosaic paints along the pointer, wider than a stroke of the
+		// width the toolbar shows, and covers the box a drag spans while
+		// Shift is held.
+		s.draft.Kind = editor.KindMosaicBrush
+		s.draft.Width = s.width * s.scale() * 4
 	}
 }
 
@@ -668,7 +676,7 @@ func (s *selector) extendShape(pt ui.Point) {
 	}
 	at := s.toCapture(pt)
 	switch s.draft.Kind {
-	case editor.KindPen, editor.KindMosaic:
+	case editor.KindPen, editor.KindMosaicBrush:
 		last := s.draft.Pts[len(s.draft.Pts)-1]
 		dx, dy := at.X-last.X, at.Y-last.Y
 		if max(dx, -dx) < 2 && max(dy, -dy) < 2 {
@@ -880,6 +888,7 @@ func (s *selector) paintEdit(p *ui.Painter, r ui.Rect) {
 		shapes = append(shapes, s.draft)
 	}
 	editor.Paint(p, shapes, s.mosaic, 1/s.scale(), sel)
+	s.paintMosaicGuide(p)
 	if !s.cropping {
 		p.Stroke(sel, ui.RGB(52, 199, 89), float32(s.round), 2.5)
 		s.paintHandles(p, sel)
@@ -897,6 +906,41 @@ func (s *selector) paintEdit(p *ui.Painter, r ui.Rect) {
 	s.placeBar(r)
 	s.bar.Draw(p, ui.Point{X: s.at[0], Y: s.at[1]}, s.hasAt)
 	s.paintTip(p, r)
+}
+
+// paintMosaicGuide frames the mosaic the pointer drags out: the squares hide
+// what they cover, so a frame says where a box stops, and a band says where a
+// brush went.
+func (s *selector) paintMosaicGuide(p *ui.Painter) {
+	if !s.drafting || s.mosaic == nil {
+		return
+	}
+	accent := ui.RGB(52, 199, 89)
+	switch s.draft.Kind {
+	case editor.KindMosaic:
+		area := s.mosaic.Area(s.draft)
+		if area.Empty() {
+			return
+		}
+		x0, y0 := s.toWindow(area.Min)
+		x1, y1 := s.toWindow(area.Max)
+		p.Stroke(ui.Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}, accent, 0, 1.5)
+	case editor.KindMosaicBrush:
+		if len(s.draft.Pts) < 2 {
+			return
+		}
+		path := &ui.Path{}
+		for i, pt := range s.draft.Pts {
+			x, y := s.toWindow(pt)
+			if i == 0 {
+				path.MoveTo(x, y)
+				continue
+			}
+			path.LineTo(x, y)
+		}
+		p.StrokePath(path, 2*s.draft.Width/s.scale(), ui.RGBA(52, 199, 89, 0.28))
+		p.StrokePath(path, 1, ui.RGBA(52, 199, 89, 0.8))
+	}
 }
 
 // paintGrab shows which side of the selection the pointer would move.

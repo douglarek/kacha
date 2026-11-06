@@ -19,6 +19,31 @@ func paintInto(t *testing.T, size image.Point, shapes []Shape, dips float32, dst
 	}, size.X, size.Y, 1)
 }
 
+// paintMosaicInto renders shapes over img through its mosaic, and returns
+// the frame.
+func paintMosaicInto(t *testing.T, img image.Image, shapes []Shape) *image.RGBA {
+	t.Helper()
+	mosaic := NewMosaic(img)
+	return ui.Render(func(c *ui.Context) {
+		ui.Box(c).Fill().Draw(func(p *ui.Painter, box ui.Rect) {
+			p.Image(ui.NewBitmap(img), box, ui.FillBox)
+			Paint(p, shapes, mosaic, 1, ui.Rect{})
+		})
+	}, img.Bounds().Dx(), img.Bounds().Dy(), 1)
+}
+
+// shades returns a capture whose every pixel has a shade of its own, so that
+// a mosaic shows as squares of one shade.
+func shades(w, h int) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			img.Set(x, y, color.RGBA{R: uint8(x * 2), G: uint8(y * 2), B: 100, A: 255})
+		}
+	}
+	return img
+}
+
 func TestPaintPlacesAStrokeWhereItWasDrawn(t *testing.T) {
 	shape := Shape{
 		Kind:  KindRect,
@@ -217,6 +242,78 @@ func TestPixelate(t *testing.T) {
 	if c := got.RGBAAt(1, 0); c.R != 200 {
 		t.Errorf("right block = %v, want light grey", c)
 	}
+}
+
+func TestMosaicCoversTheBoxItWasDraggedOver(t *testing.T) {
+	src := shades(96, 96)
+	shape := Shape{
+		Kind: KindMosaic,
+		Pts:  []image.Point{{X: 30, Y: 40}, {X: 70, Y: 64}},
+	}
+	frame := paintMosaicInto(t, src, []Shape{shape})
+
+	// The squares grow past the box to the grid of the whole capture.
+	if !flatSquares(frame, image.Rect(24, 36, 72, 72)) {
+		t.Error("the box kept the shades of the capture")
+	}
+	for _, pt := range []image.Point{{X: 18, Y: 30}, {X: 80, Y: 80}} {
+		if frame.At(pt.X, pt.Y) != src.At(pt.X, pt.Y) {
+			t.Errorf("the mosaic reached %v, outside the box", pt)
+		}
+	}
+}
+
+func TestMosaicAreaIsWhatTheShapeCovers(t *testing.T) {
+	src := shades(96, 96)
+	mosaic := NewMosaic(src)
+
+	// A box grows to the squares it touches, as the squares it draws do.
+	box := mosaic.Area(Shape{Kind: KindMosaic, Pts: []image.Point{{X: 30, Y: 40}, {X: 70, Y: 64}}})
+	if want := image.Rect(24, 36, 72, 72); box != want {
+		t.Errorf("the box covers %v, want %v", box, want)
+	}
+	// A stroke covers whatever its stamps touch, along the whole path.
+	stroke := mosaic.Area(Shape{
+		Kind:  KindMosaicBrush,
+		Width: 8,
+		Pts:   []image.Point{{X: 20, Y: 20}, {X: 60, Y: 20}},
+	})
+	if want := image.Rect(12, 12, 72, 36); stroke != want {
+		t.Errorf("the stroke covers %v, want %v", stroke, want)
+	}
+	if empty := mosaic.Area(Shape{Kind: KindMosaicBrush}); !empty.Empty() {
+		t.Errorf("a brush with no points covers %v", empty)
+	}
+}
+
+func TestMosaicBrushFollowsThePath(t *testing.T) {
+	src := shades(96, 96)
+	shape := Shape{
+		Kind:  KindMosaicBrush,
+		Width: 8,
+		Pts:   []image.Point{{X: 20, Y: 20}, {X: 40, Y: 20}, {X: 60, Y: 20}},
+	}
+	frame := paintMosaicInto(t, src, []Shape{shape})
+
+	if !flatSquares(frame, image.Rect(12, 12, 72, 36)) {
+		t.Error("the path kept the shades of the capture")
+	}
+	if frame.At(20, 60) != src.At(20, 60) {
+		t.Error("the brush painted away from its path")
+	}
+}
+
+// flatSquares reports whether every Block×Block square of img inside r is one
+// shade, as the squares of a mosaic are.
+func flatSquares(img image.Image, r image.Rectangle) bool {
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			if img.At(x, y) != img.At(x-x%Block, y-y%Block) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // hasColor reports whether any pixel inside r has the toolbar's red.

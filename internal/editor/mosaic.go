@@ -39,26 +39,80 @@ func (m *Mosaic) Stamp(p *ui.Painter, pts []image.Point, r float32) {
 			continue
 		}
 		last = src
-		dst := ui.Rect{
-			X: float32(src.Min.X), Y: float32(src.Min.Y),
-			W: float32(src.Dx()), H: float32(src.Dy()),
-		}
-		p.ImageRegion(m.Bitmap, ui.Rect{
-			X: float32(src.Min.X) / m.Block, Y: float32(src.Min.Y) / m.Block,
-			W: float32(src.Dx()) / m.Block, H: float32(src.Dy()) / m.Block,
-		}, dst, ui.ImageOptions{})
+		m.draw(p, src)
 	}
+}
+
+// Cover draws the pixels of the mosaic inside r, a box in the pixels of the
+// capture, grown to the squares it touches, as a stamp is.
+func (m *Mosaic) Cover(p *ui.Painter, r image.Rectangle) {
+	if m == nil || m.Bitmap == nil || m.Block <= 0 || r.Empty() {
+		return
+	}
+	m.draw(p, m.grid(r))
+}
+
+// Area returns the box of the capture s covers with squares, which is where a
+// frame around it goes: what a heavy hand covers is hard to tell from what it
+// hides.
+func (m *Mosaic) Area(s Shape) image.Rectangle {
+	if m == nil || m.Bitmap == nil || m.Block <= 0 {
+		return image.Rectangle{}
+	}
+	cover := image.Rectangle{}
+	if s.Kind == KindMosaic {
+		cover = m.grid(s.Rect())
+	} else {
+		for i, pt := range s.Pts {
+			r := m.rectAt(pt, max(s.Width, m.Block/2))
+			if i == 0 {
+				cover = r
+				continue
+			}
+			cover = cover.Union(r)
+		}
+	}
+	side := int(m.Block)
+	w, h := m.Bitmap.Size()
+	return cover.Intersect(image.Rect(0, 0, w*side, h*side))
+}
+
+// draw shows the squares of the mosaic inside src, which it cuts to the
+// capture.
+func (m *Mosaic) draw(p *ui.Painter, src image.Rectangle) {
+	side := int(m.Block)
+	w, h := m.Bitmap.Size()
+	src = src.Intersect(image.Rect(0, 0, w*side, h*side))
+	if src.Empty() {
+		return
+	}
+	p.ImageRegion(m.Bitmap, ui.Rect{
+		X: float32(src.Min.X) / m.Block, Y: float32(src.Min.Y) / m.Block,
+		W: float32(src.Dx()) / m.Block, H: float32(src.Dy()) / m.Block,
+	}, ui.Rect{
+		X: float32(src.Min.X), Y: float32(src.Min.Y),
+		W: float32(src.Dx()), H: float32(src.Dy()),
+	}, ui.ImageOptions{})
+}
+
+// grid returns r grown to the squares of the mosaic. Every shape snaps to
+// the same squares, so that the ones next to each other line up.
+func (m *Mosaic) grid(r image.Rectangle) image.Rectangle {
+	b, side := float64(m.Block), int(m.Block)
+	return image.Rect(
+		int(math.Floor(float64(r.Min.X)/b))*side,
+		int(math.Floor(float64(r.Min.Y)/b))*side,
+		int(math.Ceil(float64(r.Max.X)/b))*side,
+		int(math.Ceil(float64(r.Max.Y)/b))*side,
+	)
 }
 
 // rectAt returns the squares the brush at pt covers, on the grid.
 func (m *Mosaic) rectAt(pt image.Point, r float32) image.Rectangle {
-	b := float64(m.Block)
-	return image.Rect(
-		int(math.Floor((float64(pt.X)-float64(r))/b))*int(m.Block),
-		int(math.Floor((float64(pt.Y)-float64(r))/b))*int(m.Block),
-		int(math.Ceil((float64(pt.X)+float64(r))/b))*int(m.Block),
-		int(math.Ceil((float64(pt.Y)+float64(r))/b))*int(m.Block),
-	)
+	return m.grid(image.Rect(
+		int(float64(pt.X)-float64(r)), int(float64(pt.Y)-float64(r)),
+		int(float64(pt.X)+float64(r)), int(float64(pt.Y)+float64(r)),
+	))
 }
 
 // Pixelate returns img as block×block squares of its average color.

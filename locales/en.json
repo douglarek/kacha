@@ -9,7 +9,7 @@
   "toolArrow": "Arrow",
   "toolPen": "Pen",
   "toolText": "Text",
-  "toolMosaic": "Mosaic",
+  "toolMosaic": "Mosaic: drag to paint, Shift covers a region",
   "colorRed": "Red",
   "colorOrange": "Orange",
   "colorYellow": "Yellow",

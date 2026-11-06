@@ -17,7 +17,11 @@ const (
 	KindArrow
 	KindPen
 	KindText
+	// KindMosaic covers the box its corners span with squares.
 	KindMosaic
+	// KindMosaicBrush follows Pts as a pen does, covering the squares of the
+	// mosaic under its path.
+	KindMosaicBrush
 	// KindBadge numbers what the other shapes point at: a filled circle
 	// with the number in Text.
 	KindBadge
@@ -33,8 +37,8 @@ type Shape struct {
 	// Width is the stroke width, or for a text the height of a glyph, in
 	// pixels of the capture.
 	Width float32
-	// Pts are the corners of a rect, ellipse or arrow, the path of a pen or
-	// mosaic brush, and the top left corner of a text.
+	// Pts are the corners of a rect, ellipse, arrow or mosaic, the path of a
+	// pen or mosaic brush, and the top left corner of a text.
 	Pts []image.Point
 	// Text is what a text shape shows.
 	Text string
@@ -61,7 +65,7 @@ func (s Shape) Empty() bool {
 		return s.Text == ""
 	case KindBadge:
 		return len(s.Pts) == 0 || s.Text == ""
-	case KindPen, KindMosaic:
+	case KindPen, KindMosaicBrush:
 		return len(s.Pts) < 2
 	default:
 		r := s.Rect()
