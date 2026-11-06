@@ -6,6 +6,7 @@ package macwin
 import (
 	"runtime"
 	"sync"
+	"unsafe"
 
 	"github.com/ebitengine/purego"
 	"github.com/egoist/mygo"
@@ -57,19 +58,7 @@ func CoverMenuBar(w *mygo.Window) {
 
 		// The app may be in the background when a shortcut starts a
 		// capture, where a window takes no keys until the app comes first.
-		appName := cstr("NSApplication")
-		appClass := objcClass(&appName[0])
-		runtime.KeepAlive(appName)
-		if appClass != 0 {
-			shared := cstr("sharedApplication")
-			app := objcSend2(appClass, objcSelName(&shared[0]))
-			runtime.KeepAlive(shared)
-			if app != 0 {
-				activate := cstr("activateIgnoringOtherApps:")
-				objcSend3(app, objcSelName(&activate[0]), 1)
-				runtime.KeepAlive(activate)
-			}
-		}
+		activateApp()
 		front := cstr("makeKeyAndOrderFront:")
 		objcSend3(handle, objcSelName(&front[0]), 0)
 		runtime.KeepAlive(front)
@@ -111,9 +100,27 @@ func activateApp() {
 	if app == 0 {
 		return
 	}
+	// macOS 14 asks for the front with activate, which the call it replaced
+	// no longer stands in for; the older one is what an older system has.
+	if responds(app, "activate") {
+		activate := cstr("activate")
+		objcSend2(app, objcSelName(&activate[0]))
+		runtime.KeepAlive(activate)
+		return
+	}
 	activate := cstr("activateIgnoringOtherApps:")
 	objcSend3(app, objcSelName(&activate[0]), 1)
 	runtime.KeepAlive(activate)
+}
+
+// responds reports whether obj answers the selector named sel.
+func responds(obj uintptr, sel string) bool {
+	name := cstr("respondsToSelector:")
+	arg := cstr(sel)
+	ok := objcSend3(obj, objcSelName(&name[0]), uint64(uintptr(unsafe.Pointer(&arg[0])))) != 0
+	runtime.KeepAlive(name)
+	runtime.KeepAlive(arg)
+	return ok
 }
 
 // AllowKeys makes the classes of mygo's windows answer yes to

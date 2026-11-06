@@ -106,6 +106,9 @@ func run(s *selector) error {
 		w.SetSize(o.Place.Width, o.Place.Height)
 		w.SetPosition(o.Place.X, o.Place.Y)
 	}
+	if stop := watchEscape(s.escape); stop != nil {
+		defer stop()
+	}
 	select {
 	case err := <-s.results:
 		return err
@@ -220,6 +223,9 @@ type selector struct {
 	moveShape editor.Shape
 
 	finished bool
+	// escapedAt is when Escape last left something, which a press that comes
+	// twice at once is told by.
+	escapedAt time.Time
 }
 
 // asRGBA returns img as the premultiplied RGBA whose pixels mygo shows as
@@ -257,20 +263,7 @@ func (s *selector) view(c *ui.Context) {
 		return
 	}
 	if c.Shortcut(0, ui.KeyEscape) {
-		if s.typing {
-			// The text an escape leaves was there before, and stays.
-			if s.edited != nil {
-				s.board.Add(*s.edited)
-			}
-			s.typing, s.text, s.edited = false, "", nil
-			return
-		}
-		if s.pickerOpen {
-			// The panel of emoji goes first, and a second Escape leaves.
-			s.pickerOpen = false
-			return
-		}
-		s.finish(nil, ChoiceBoth, ErrCanceled)
+		s.escape()
 		return
 	}
 	if s.phase == phaseEdit && !s.typing {
@@ -324,6 +317,35 @@ func (s *selector) view(c *ui.Context) {
 	} else {
 		s.trackEditing(root)
 	}
+}
+
+// escape settles a text, puts the panel of emoji away, or leaves the capture,
+// as a press of Escape does, wherever the press came from.
+func (s *selector) escape() {
+	if s.finished {
+		return
+	}
+	// The key and the global shortcut that takes it while the window has no
+	// keys may both arrive for one press.
+	if time.Since(s.escapedAt) < 150*time.Millisecond {
+		return
+	}
+	s.escapedAt = time.Now()
+	Logf("overlay: escape phase=%v typing=%v picker=%v", s.phase, s.typing, s.pickerOpen)
+	if s.typing {
+		// The text an escape leaves was there before, and stays.
+		if s.edited != nil {
+			s.board.Add(*s.edited)
+		}
+		s.typing, s.text, s.edited = false, "", nil
+		return
+	}
+	if s.pickerOpen {
+		// The panel of emoji goes first, and a second Escape leaves.
+		s.pickerOpen = false
+		return
+	}
+	s.finish(nil, ChoiceBoth, ErrCanceled)
 }
 
 // trackSelection reads the drag that picks the part to keep.
