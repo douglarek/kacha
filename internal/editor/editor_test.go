@@ -163,6 +163,28 @@ func TestTakeLiftsAShapeOut(t *testing.T) {
 	}
 }
 
+func TestKeepDropsWhatTheCropLeftOut(t *testing.T) {
+	var b Board
+	inside := Shape{Kind: KindRect, Color: ui.RGB(240, 68, 56), Width: 2, Pts: []image.Point{{X: 10, Y: 10}, {X: 40, Y: 40}}}
+	outside := Shape{Kind: KindRect, Color: ui.RGB(240, 68, 56), Width: 2, Pts: []image.Point{{X: 200, Y: 200}, {X: 240, Y: 240}}}
+	text := Shape{Kind: KindEmoji, Color: ui.RGB(240, 68, 56), Width: 24, Pts: []image.Point{{X: 60, Y: 60}}, Text: "😀"}
+	b.Add(inside)
+	b.Add(outside)
+	b.Add(text)
+
+	// The crop keeps a hundred pixels square, which the emoji straddles.
+	b.Keep(image.Rect(0, 0, 100, 100))
+
+	if b.Len() != 2 {
+		t.Fatalf("board holds %d shapes, want the shape and the emoji", b.Len())
+	}
+	for _, got := range b.Shapes() {
+		if got.Pts[0] == outside.Pts[0] {
+			t.Error("the shape outside the crop stayed")
+		}
+	}
+}
+
 func TestPlaceToolbar(t *testing.T) {
 	win := ui.Rect{W: 900, H: 600}
 	tests := []struct {

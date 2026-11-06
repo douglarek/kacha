@@ -637,6 +637,8 @@ func (s *selector) rebuild() {
 	s.board.Shift(s.cropAt.Min.X-at.Min.X, s.cropAt.Min.Y-at.Min.Y)
 	s.cropAt = at
 	img := cropImage(s.o.Image, at)
+	// What the new crop leaves out goes with it.
+	s.board.Keep(img.Bounds())
 	s.crop = img
 	s.mosaic = editor.NewMosaic(img)
 }

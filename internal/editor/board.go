@@ -189,3 +189,46 @@ func Extent(s Shape) (float32, float32) {
 	}
 	return width, s.Width * 1.15
 }
+
+// Bounds returns the box a shape covers, in the pixels of the capture.
+func (s Shape) Bounds() image.Rectangle {
+	switch s.Kind {
+	case KindText, KindEmoji, KindBadge:
+		if len(s.Pts) == 0 {
+			return image.Rectangle{}
+		}
+		w, h := Extent(s)
+		at := s.Pts[0]
+		if s.Kind == KindText {
+			return image.Rect(at.X, at.Y, at.X+int(w), at.Y+int(h))
+		}
+		// An emoji and a badge sit centred on their point.
+		return image.Rect(at.X-int(w/2), at.Y-int(h/2), at.X+int(w/2), at.Y+int(h/2))
+	case KindPen, KindMosaicBrush:
+		if len(s.Pts) == 0 {
+			return image.Rectangle{}
+		}
+		box := image.Rectangle{Min: s.Pts[0], Max: s.Pts[0]}
+		for _, pt := range s.Pts[1:] {
+			box = box.Union(image.Rectangle{Min: pt, Max: pt})
+		}
+		pad := int(s.Width / 2)
+		return box.Inset(-pad)
+	default:
+		return s.Rect()
+	}
+}
+
+// Keep drops the shapes the capture no longer shows, which a crop leaves
+// outside what it kept: a shape that is not in the capture is in the dark
+// around the selection, where nothing should be.
+func (b *Board) Keep(bounds image.Rectangle) {
+	kept := b.shapes[:0]
+	for _, shape := range b.shapes {
+		if shape.Bounds().Overlaps(bounds) {
+			kept = append(kept, shape)
+		}
+	}
+	b.shapes = kept
+	b.undone = b.undone[:0]
+}

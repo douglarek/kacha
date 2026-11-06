@@ -233,6 +233,38 @@ func TestClickingPlacesNumberedBadges(t *testing.T) {
 	}
 }
 
+func TestCroppingDropsTheShapesItLeavesOut(t *testing.T) {
+	s, tt := open(t, nil)
+	selectArea(t, tt)
+
+	// A shape in the corner the crop leaves out, and one it keeps.
+	tt.Press(120, 110)
+	tt.Move(150, 140)
+	tt.Release(150, 140)
+	tt.Press(210, 190)
+	tt.Move(230, 210)
+	tt.Release(230, 210)
+	if s.board.Len() != 2 {
+		t.Fatalf("board holds %d shapes, want 2", s.board.Len())
+	}
+
+	button, ok := s.bar.Tool(editor.KindCrop)
+	if !ok {
+		t.Fatal("the toolbar has no crop tool")
+	}
+	tt.ClickAt(button.Rect.X+button.Rect.W/2, button.Rect.Y+button.Rect.H/2)
+	tt.Press(200, 180)
+	tt.Move(280, 240)
+	tt.Release(280, 240)
+
+	if got := s.board.Len(); got != 1 {
+		t.Fatalf("board holds %d shapes, want the one the crop kept", got)
+	}
+	if box := s.board.Shapes()[0].Bounds(); box.Empty() || box.Min.X < 0 || box.Min.Y < 0 {
+		t.Errorf("the kept shape sits at %v, want it inside the crop", box)
+	}
+}
+
 func TestCropToolKeepsTheDraggedPart(t *testing.T) {
 	s, tt := open(t, nil)
 	selectArea(t, tt)
