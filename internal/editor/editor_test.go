@@ -303,6 +303,67 @@ func TestMosaicBrushFollowsThePath(t *testing.T) {
 	}
 }
 
+func TestLayoutPicker(t *testing.T) {
+	for _, win := range []ui.Rect{{W: 1000, H: 640}, {W: 520, H: 420}} {
+		bar := Layout(ui.Rect{X: 100, Y: 100, W: 400, H: 300}, win, State{Tool: KindEmoji, Width: Widths()[1]})
+		picker := LayoutPicker(bar, win, Emojis()[3])
+
+		if len(picker.Buttons) != len(Emojis()) {
+			t.Fatalf("the panel holds %d emoji, want %d", len(picker.Buttons), len(Emojis()))
+		}
+		if p := picker.Rect; p.X < 0 || p.Y < 0 || p.X+p.W > win.W || p.Y+p.H > win.H {
+			t.Errorf("in a %g×%g window, the panel %+v leaves the window", win.W, win.H, p)
+		}
+		if picker.Rect.Y+picker.Rect.H > bar.Rect.Y && win.W > 600 {
+			t.Errorf("the panel %+v covers the toolbar %+v", picker.Rect, bar.Rect)
+		}
+		for i, button := range picker.Buttons {
+			if button.Text != Emojis()[i] {
+				t.Errorf("cell %d shows %q, want %q", i, button.Text, Emojis()[i])
+			}
+			if b := button.Rect; b.X < picker.Rect.X || b.Y < picker.Rect.Y || b.X+b.W > picker.Rect.X+picker.Rect.W || b.Y+b.H > picker.Rect.Y+picker.Rect.H {
+				t.Errorf("cell %d at %+v leaves the panel", i, b)
+			}
+			if active := button.Action.Emoji == Emojis()[3]; button.Active != active {
+				t.Errorf("cell %d is lit: %v", i, button.Active)
+			}
+		}
+	}
+}
+
+func TestPaintEmojiDrawsItsGlyphOverThePoint(t *testing.T) {
+	shape := Shape{
+		Kind:  KindEmoji,
+		Width: 32,
+		Pts:   []image.Point{{X: 40, Y: 40}},
+		Text:  "🎉",
+	}
+	frame := paintInto(t, image.Pt(80, 80), []Shape{shape}, 1, ui.Rect{})
+
+	if !hasColorOf(frame, image.Rect(20, 20, 60, 60)) {
+		t.Error("no glyph where the emoji was placed")
+	}
+	if hasColorOf(frame, image.Rect(0, 0, 12, 12)) {
+		t.Error("the glyph reached the corner, away from its point")
+	}
+}
+
+// hasColorOf reports whether any pixel inside r has colors of its own, as a
+// color emoji's have.
+func hasColorOf(img image.Image, r image.Rectangle) bool {
+	for y := max(r.Min.Y, 0); y < min(r.Max.Y, img.Bounds().Dy()); y++ {
+		for x := max(r.Min.X, 0); x < min(r.Max.X, img.Bounds().Dx()); x++ {
+			red, green, blue, _ := img.At(x, y).RGBA()
+			most := max(red, green, blue)
+			least := min(red, green, blue)
+			if most-least > 0x2000 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // flatSquares reports whether every Block×Block square of img inside r is one
 // shade, as the squares of a mosaic are.
 func flatSquares(img image.Image, r image.Rectangle) bool {

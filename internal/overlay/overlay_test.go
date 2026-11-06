@@ -538,6 +538,175 @@ func hasRed(img image.Image) bool {
 	return false
 }
 
+// pickEmoji presses the emoji tool, takes the emoji at index of the panel it
+// offers, and returns what it put on the capture.
+func pickEmoji(t *testing.T, s *selector, tt *ui.Tester, index int) string {
+	t.Helper()
+	button, ok := s.bar.Tool(editor.KindEmoji)
+	if !ok {
+		t.Fatal("the toolbar has no emoji tool")
+	}
+	tt.ClickAt(button.Rect.X+button.Rect.W/2, button.Rect.Y+button.Rect.H/2)
+	if !s.pickerOpen {
+		t.Fatal("the emoji tool showed no panel")
+	}
+	if index < 0 || index >= len(s.picker.Buttons) {
+		t.Fatalf("the panel holds %d emoji", len(s.picker.Buttons))
+	}
+	cell := s.picker.Buttons[index]
+	tt.ClickAt(cell.Rect.X+cell.Rect.W/2, cell.Rect.Y+cell.Rect.H/2)
+	if s.pickerOpen {
+		t.Error("picking an emoji left the panel open")
+	}
+	return cell.Action.Emoji
+}
+
+func TestEmojiLandsInTheSelection(t *testing.T) {
+	var got image.Image
+	s, tt := open(t, func(img image.Image, _ Choice) error { got = img; return nil })
+	selectArea(t, tt)
+
+	emoji := pickEmoji(t, s, tt, 2)
+	shapes := s.board.Shapes()
+	if len(shapes) != 1 {
+		t.Fatalf("board holds %d shapes, want the emoji", len(shapes))
+	}
+	if shape := shapes[0]; shape.Kind != editor.KindEmoji || shape.Text != emoji {
+		t.Errorf("the shape is %v %q, want the emoji", shape.Kind, shape.Text)
+	}
+	// Two capture pixels a DIP, from the selection's corner at 100,100: the
+	// middle of the 200×150 DIP selection.
+	if want := (image.Point{X: 200, Y: 150}); shapes[0].Pts[0] != want {
+		t.Errorf("the emoji sits at %v, want %v", shapes[0].Pts[0], want)
+	}
+	if s.selected != 0 {
+		t.Errorf("picked %d, want the emoji it just put there", s.selected)
+	}
+
+	tt.Key(0, ui.KeyEnter)
+	if got == nil {
+		t.Fatal("nothing was delivered")
+	}
+	if !hasFace(got, image.Rect(150, 100, 250, 200)) {
+		t.Error("the emoji is not in the delivered image")
+	}
+}
+
+func TestDraggingAnEmojiMovesIt(t *testing.T) {
+	s, tt := open(t, nil)
+	selectArea(t, tt)
+	pickEmoji(t, s, tt, 2)
+	// Longer than the double click window, so that the press picks the emoji
+	// rather than opening the panel again.
+	tt.Advance(time.Second)
+	before := s.board.Shapes()[0].Pts[0]
+
+	// Two capture pixels a DIP: the middle of the selection, where the emoji
+	// was put, is 200,175 in the window's DIPs.
+	tt.Press(200, 175)
+	if s.selected != 0 {
+		t.Fatalf("picked %d, want the emoji", s.selected)
+	}
+	tt.Move(240, 215)
+	tt.Release(240, 215)
+
+	if s.board.Len() != 1 {
+		t.Errorf("board holds %d shapes, want the emoji alone", s.board.Len())
+	}
+	after := s.board.Shapes()[0].Pts[0]
+	if after.X <= before.X || after.Y <= before.Y {
+		t.Errorf("the emoji sits at %v, want it moved from %v", after, before)
+	}
+}
+
+func TestDraggingACornerResizesAnEmoji(t *testing.T) {
+	s, tt := open(t, nil)
+	selectArea(t, tt)
+	pickEmoji(t, s, tt, 2)
+	tt.Advance(time.Second)
+	before := s.board.Shapes()[0].Width
+
+	// The bottom right corner of the emoji, which the middle click picked.
+	box := s.pickedBox(s.board.Shapes()[0])
+	tt.Press(box.X+box.W, box.Y+box.H)
+	if !s.resizingEmoji {
+		t.Fatal("a corner of the emoji started no resize")
+	}
+	tt.Move(box.X+box.W+60, box.Y+box.H+60)
+	tt.Release(box.X+box.W+60, box.Y+box.H+60)
+
+	if s.resizingEmoji {
+		t.Error("the resize went on after the pointer came up")
+	}
+	if after := s.board.Shapes()[0].Width; after <= before {
+		t.Errorf("the emoji is %g big, want it grown from %g", after, before)
+	}
+	if s.board.Len() != 1 {
+		t.Errorf("board holds %d shapes, want the emoji alone", s.board.Len())
+	}
+}
+
+func TestTheEmojiButtonPutsItsPanelAway(t *testing.T) {
+	s, tt := open(t, nil)
+	selectArea(t, tt)
+	button, ok := s.bar.Tool(editor.KindEmoji)
+	if !ok {
+		t.Fatal("the toolbar has no emoji tool")
+	}
+	at := func() { tt.ClickAt(button.Rect.X+button.Rect.W/2, button.Rect.Y+button.Rect.H/2) }
+
+	at()
+	if !s.pickerOpen {
+		t.Fatal("the emoji tool showed no panel")
+	}
+	at()
+	if s.pickerOpen {
+		t.Error("a second press left the panel open")
+	}
+	at()
+	if !s.pickerOpen {
+		t.Error("a third press showed no panel again")
+	}
+}
+
+func TestEscapeClosesTheEmojiPanel(t *testing.T) {
+	s, tt := open(t, nil)
+	selectArea(t, tt)
+	button, ok := s.bar.Tool(editor.KindEmoji)
+	if !ok {
+		t.Fatal("the toolbar has no emoji tool")
+	}
+	tt.ClickAt(button.Rect.X+button.Rect.W/2, button.Rect.Y+button.Rect.H/2)
+	if !s.pickerOpen {
+		t.Fatal("the emoji tool showed no panel")
+	}
+
+	tt.Key(0, ui.KeyEscape)
+	if s.pickerOpen {
+		t.Error("Escape left the panel open")
+	}
+	select {
+	case err := <-s.results:
+		t.Errorf("Escape ended the capture: %v", err)
+	default:
+	}
+}
+
+// hasFace reports whether img holds bright yellow inside r, as the faces of
+// the emoji the panel offers do.
+func hasFace(img image.Image, r image.Rectangle) bool {
+	r = r.Intersect(img.Bounds())
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			red, green, blue, _ := img.At(x, y).RGBA()
+			if red>>8 > 200 && green>>8 > 150 && blue>>8 < 120 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // squares reports whether every Block×Block square of img inside r is one
 // color, as the squares of a mosaic are.
 func squares(img image.Image, r image.Rectangle) bool {

@@ -10,6 +10,9 @@
   "toolPen": "Pen",
   "toolText": "Text",
   "toolMosaic": "Mosaic: drag to paint, Shift covers a region",
+  "@toolMosaic": {
+    "description": "The tip of the mosaic tool, which says how a drag covers a region and how Shift paints along the pointer."
+  },
   "colorRed": "Red",
   "colorOrange": "Orange",
   "colorYellow": "Yellow",
@@ -49,6 +52,10 @@
   "commandCopy": "Copy to the clipboard",
   "captureFailed": "Kacha could not capture the screen",
   "toolNumber": "Number",
+  "toolEmoji": "Emoji: pick one, then click where it goes",
+  "@toolEmoji": {
+    "description": "The tip of the emoji tool, which says how it places what its panel offers."
+  },
   "toolCrop": "Crop",
   "settingsTitle": "Settings",
   "settingsLaunchAtLogin": "Open at login",

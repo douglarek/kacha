@@ -100,10 +100,16 @@ func (msgs Messages) ToolText() string {
 
 // ToolMosaic says "Mosaic: drag to paint, Shift covers a region"
 // in the language the app shows.
+//
+// The tip of the mosaic tool, which says how a drag covers a region and how
+// Shift paints along the pointer.
 func ToolMosaic() string { return In(i18n.Locale()).ToolMosaic() }
 
 // ToolMosaic says "Mosaic: drag to paint, Shift covers a region"
 // in the language of msgs.
+//
+// The tip of the mosaic tool, which says how a drag covers a region and how
+// Shift paints along the pointer.
 func (msgs Messages) ToolMosaic() string {
 	return Catalog.Format(msgs.locale, "toolMosaic", nil)
 }
@@ -284,6 +290,22 @@ func ToolNumber() string { return In(i18n.Locale()).ToolNumber() }
 // in the language of msgs.
 func (msgs Messages) ToolNumber() string {
 	return Catalog.Format(msgs.locale, "toolNumber", nil)
+}
+
+// ToolEmoji says "Emoji: pick one, then click where it goes"
+// in the language the app shows.
+//
+// The tip of the emoji tool, which says how it places what its panel
+// offers.
+func ToolEmoji() string { return In(i18n.Locale()).ToolEmoji() }
+
+// ToolEmoji says "Emoji: pick one, then click where it goes"
+// in the language of msgs.
+//
+// The tip of the emoji tool, which says how it places what its panel
+// offers.
+func (msgs Messages) ToolEmoji() string {
+	return Catalog.Format(msgs.locale, "toolEmoji", nil)
 }
 
 // ToolCrop says "Crop"

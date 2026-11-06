@@ -176,6 +176,18 @@ type selector struct {
 	// shift is whether Shift was held as the frame read the pointer: a
 	// mosaic drag paints along it, and one that holds Shift covers a region.
 	shift bool
+	// emoji is the emoji the panel left, picker the panel itself, which
+	// shows while pickerOpen does, and onPicker whether the press went down
+	// on it.
+	emoji      string
+	picker     editor.Bar
+	pickerOpen bool
+	onPicker   bool
+	// resizingEmoji is whether the pointer drags a corner of the emoji it
+	// picked, which stays at the corner of emojiFixed, in the pixels of the
+	// capture.
+	resizingEmoji bool
+	emojiFixed    image.Point
 
 	// round is the corner radius, in DIPs, of the window the selection came
 	// from, 0 for a selection the user dragged.
@@ -253,6 +265,11 @@ func (s *selector) view(c *ui.Context) {
 			s.typing, s.text, s.edited = false, "", nil
 			return
 		}
+		if s.pickerOpen {
+			// The panel of emoji goes first, and a second Escape leaves.
+			s.pickerOpen = false
+			return
+		}
 		s.finish(nil, ChoiceBoth, ErrCanceled)
 		return
 	}
@@ -287,16 +304,19 @@ func (s *selector) view(c *ui.Context) {
 		return
 	}
 	if s.phase == phaseEdit && root.DoubleClicked() {
-		// A double click on a text types it again; anywhere else it ends the
-		// capture.
-		if x, y, over := root.PointerPosition(); over {
-			if i, ok := s.textUnder(ui.Point{X: x, Y: y}); ok {
+		// A double click on a text types it again, and one anywhere else ends
+		// the capture. On the toolbar, or on the panel of emoji it opened, it
+		// is two presses of a button, which the drag below reads.
+		x, y, over := root.PointerPosition()
+		at := ui.Point{X: x, Y: y}
+		if !over || !(s.bar.Holds(at) || s.picker.Holds(at)) {
+			if i, ok := s.textUnder(at); over && ok {
 				s.editText(i)
 				return
 			}
+			s.commit(ChoiceCopyOnly)
+			return
 		}
-		s.commit(ChoiceCopyOnly)
-		return
 	}
 	s.shift = c.Modifiers()&ui.Shift != 0
 	if s.phase == phaseSelect {
@@ -339,12 +359,21 @@ func (s *selector) trackEditing(root ui.Element) {
 	switch {
 	case down && !s.pressed:
 		s.pressed = true
-		s.onButton = false
+		s.onButton, s.onPicker = false, false
+		if s.pickerOpen && s.picker.Holds(pt) {
+			if button, ok := s.picker.Hit(pt); ok {
+				s.onPicker = true
+				s.pressedOn = button.Rect
+			}
+			return
+		}
 		if button, ok := s.bar.Hit(pt); ok && !button.Disabled {
 			s.onButton = true
 			s.pressedOn = button.Rect
 			return
 		}
+		// A press anywhere else puts the panel of emoji away.
+		s.pickerOpen = false
 		if s.bar.Holds(pt) {
 			s.barDragging = true
 			s.lastAt = [2]float32{x, y}
@@ -376,8 +405,12 @@ func (s *selector) trackEditing(root ui.Element) {
 			s.cropTo = pt
 			return
 		}
+		if s.resizingEmoji {
+			s.resizeEmoji(pt)
+			return
+		}
 		if s.moving {
-			s.moveText(pt)
+			s.movePicked(pt)
 			return
 		}
 		if s.drafting {
@@ -386,6 +419,13 @@ func (s *selector) trackEditing(root ui.Element) {
 	case s.pressed:
 		s.pressed = false
 		s.barDragging = false
+		if s.onPicker {
+			s.onPicker = false
+			if button, ok := s.picker.Hit(pt); ok && button.Rect == s.pressedOn {
+				s.act(button.Action)
+			}
+			return
+		}
 		if s.resizing != 0 {
 			s.resizing = 0
 			s.rebuild()
@@ -394,6 +434,10 @@ func (s *selector) trackEditing(root ui.Element) {
 		if s.cropping {
 			s.cropping = false
 			s.applyCrop()
+			return
+		}
+		if s.resizingEmoji {
+			s.resizingEmoji = false
 			return
 		}
 		if s.moving {
@@ -411,8 +455,8 @@ func (s *selector) trackEditing(root ui.Element) {
 	}
 }
 
-// pickText selects the text at index, which the drag beginning at pt moves.
-func (s *selector) pickText(index int, pt ui.Point) {
+// pickUp selects the shape at index, which the drag beginning at pt moves.
+func (s *selector) pickUp(index int, pt ui.Point) {
 	shapes := s.board.Shapes()
 	if index < 0 || index >= len(shapes) {
 		return
@@ -423,9 +467,9 @@ func (s *selector) pickText(index int, pt ui.Point) {
 	s.moveShape = shapes[index]
 }
 
-// moveText moves the text the pointer picked along with it, kept inside the
-// capture.
-func (s *selector) moveText(pt ui.Point) {
+// movePicked moves the shape the pointer picked along with it, kept inside
+// the capture.
+func (s *selector) movePicked(pt ui.Point) {
 	if !s.moving || s.selected < 0 || len(s.moveShape.Pts) == 0 {
 		return
 	}
@@ -434,7 +478,7 @@ func (s *selector) moveText(pt ui.Point) {
 	dy := int((pt.Y - s.moveFrom.Y) * k)
 	moved := s.moveShape
 	moved.Pts = slices.Clone(s.moveShape.Pts)
-	moved.Pts[0] = s.clampText(image.Pt(
+	moved.Pts[0] = s.clampAt(image.Pt(
 		s.moveShape.Pts[0].X+dx,
 		s.moveShape.Pts[0].Y+dy,
 	))
@@ -445,11 +489,19 @@ func (s *selector) moveText(pt ui.Point) {
 func (s *selector) act(a editor.Action) {
 	switch a.Kind {
 	case editor.ActionTool:
+		// The emoji tool's button opens its panel, and a second press puts
+		// it away, as the panel's own emoji would.
+		again := s.tool == a.Tool && s.pickerOpen
 		s.tool = a.Tool
+		s.pickerOpen = a.Tool == editor.KindEmoji && !again
+		s.selected = -1
 	case editor.ActionColor:
 		s.color = a.Color
 	case editor.ActionWidth:
 		s.width = a.Width
+	case editor.ActionEmoji:
+		s.emoji, s.pickerOpen = a.Emoji, false
+		s.placeEmoji(a.Emoji)
 	case editor.ActionCommand:
 		s.command(a.Command)
 	}
@@ -501,6 +553,10 @@ const grab = 8
 
 // minSelection is the smallest selection the pointer may drag out, in DIPs.
 const minSelection = 8
+
+// minEmoji is the smallest emoji the pointer may drag out, in pixels of the
+// capture.
+const minEmoji = 12
 
 // edgeAt returns the sides of the selection that p is close enough to move.
 func (s *selector) edgeAt(p ui.Point) (e edges, ok bool) {
@@ -629,7 +685,7 @@ func (s *selector) beginShape(pt ui.Point) {
 		// that may follow moves it, rather than a second one being written
 		// over it.
 		if i, ok := s.textUnder(pt); ok {
-			s.pickText(i, pt)
+			s.pickUp(i, pt)
 			return
 		}
 		s.selected = -1
@@ -649,6 +705,22 @@ func (s *selector) beginShape(pt ui.Point) {
 			Pts:   []image.Point{at},
 			Text:  strconv.Itoa(s.board.NextBadge()),
 		})
+		return
+	}
+	if s.tool == editor.KindEmoji {
+		// A drag of a corner of the emoji picked resizes it, a drag of the
+		// emoji itself moves it, and a click anywhere else leaves both.
+		if s.selected >= 0 {
+			if fixed, ok := s.emojiCorner(pt, s.selected); ok {
+				s.resizingEmoji, s.emojiFixed = true, fixed
+				return
+			}
+		}
+		if i, ok := s.emojiUnder(pt); ok {
+			s.pickUp(i, pt)
+			return
+		}
+		s.selected = -1
 		return
 	}
 	s.drafting = true
@@ -791,8 +863,18 @@ func (s *selector) textField(c *ui.Context, root ui.Element) {
 	}
 }
 
-// clampText keeps a text's corner inside the capture.
-func (s *selector) clampText(at image.Point) image.Point {
+// sign returns 1 for a point to the right or below where it started, and -1
+// for the rest.
+func sign(n int) int {
+	if n < 0 {
+		return -1
+	}
+	return 1
+}
+
+// clampAt keeps the corner, or the point, of what the pointer drags inside
+// the capture.
+func (s *selector) clampAt(at image.Point) image.Point {
 	bounds := s.crop.Bounds()
 	at.X = min(max(at.X, 0), bounds.Dx())
 	at.Y = min(max(at.Y, 0), bounds.Dy())
@@ -811,26 +893,109 @@ func (s *selector) textSize() float32 {
 
 // textUnder returns the index of the text under p, in the window's DIPs.
 func (s *selector) textUnder(p ui.Point) (int, bool) {
-	for i, shape := range s.board.Shapes() {
-		if shape.Kind != editor.KindText || shape.Text == "" {
+	return s.shapeUnder(p, editor.KindText)
+}
+
+// emojiUnder returns the index of the emoji under p, in the window's DIPs.
+func (s *selector) emojiUnder(p ui.Point) (int, bool) {
+	return s.shapeUnder(p, editor.KindEmoji)
+}
+
+// emojiSize is the size the emoji tool places at first, in DIPs, whatever the
+// capture: the same emoji reads as the same size everywhere.
+const emojiSize = 40
+
+// placeEmoji puts emoji in the middle of the selection, picked, where a drag
+// moves it and a drag of a corner resizes it.
+func (s *selector) placeEmoji(emoji string) {
+	sel := s.selection()
+	if emoji == "" || sel.W <= 0 || s.crop == nil {
+		return
+	}
+	// Small enough for the capture to hold it, which a tiny selection is not.
+	size := min(emojiSize, min(sel.W, sel.H))
+	s.board.Add(editor.Shape{
+		Kind:  editor.KindEmoji,
+		Width: size * s.scale(),
+		Pts:   []image.Point{s.toCapture(ui.Point{X: sel.X + sel.W/2, Y: sel.Y + sel.H/2})},
+		Text:  emoji,
+	})
+	s.selected = s.board.Len() - 1
+}
+
+// emojiCorner returns the corner of the emoji at index opposite to p, in the
+// pixels of the capture, for a drag to resize it by, and reports whether p is
+// on a corner of it.
+func (s *selector) emojiCorner(p ui.Point, index int) (image.Point, bool) {
+	shapes := s.board.Shapes()
+	if index < 0 || index >= len(shapes) || shapes[index].Kind != editor.KindEmoji {
+		return image.Point{}, false
+	}
+	box := s.pickedBox(shapes[index])
+	for _, corner := range [4][2]float32{
+		{box.X, box.Y}, {box.X + box.W, box.Y},
+		{box.X, box.Y + box.H}, {box.X + box.W, box.Y + box.H},
+	} {
+		if max(corner[0]-p.X, p.X-corner[0]) > grab || max(corner[1]-p.Y, p.Y-corner[1]) > grab {
 			continue
 		}
-		if s.textBox(shape).Contains(p.X, p.Y) {
+		return s.toCapture(ui.Point{
+			X: box.X + (box.X + box.W - corner[0]),
+			Y: box.Y + (box.Y + box.H - corner[1]),
+		}), true
+	}
+	return image.Point{}, false
+}
+
+// resizeEmoji sizes the emoji the pointer picked by the corner it drags, which
+// stays the square its glyph is, around the corner that does not move.
+func (s *selector) resizeEmoji(pt ui.Point) {
+	shapes := s.board.Shapes()
+	if s.selected < 0 || s.selected >= len(shapes) {
+		return
+	}
+	emoji := shapes[s.selected]
+	at := s.toCapture(pt)
+	dx, dy := at.X-s.emojiFixed.X, at.Y-s.emojiFixed.Y
+	size := float32(max(max(dx, -dx), int(float64(max(dy, -dy))/1.15)))
+	size = max(size, minEmoji)
+	emoji.Width = size
+	emoji.Pts = []image.Point{{
+		X: s.emojiFixed.X + sign(dx)*int(size/2),
+		Y: s.emojiFixed.Y + sign(dy)*int(size*1.15/2),
+	}}
+	s.board.Replace(s.selected, emoji)
+}
+
+// shapeUnder returns the index of the shape of kind k under p, in the
+// window's DIPs.
+func (s *selector) shapeUnder(p ui.Point, k editor.Kind) (int, bool) {
+	for i, shape := range s.board.Shapes() {
+		if shape.Kind != k || shape.Text == "" {
+			continue
+		}
+		if s.pickedBox(shape).Contains(p.X, p.Y) {
 			return i, true
 		}
 	}
 	return 0, false
 }
 
-// textBox returns where a text shows in the window.
-func (s *selector) textBox(shape editor.Shape) ui.Rect {
+// pickedBox returns where a text or an emoji shows in the window: a text
+// from its corner, and an emoji around the point it sits on.
+func (s *selector) pickedBox(shape editor.Shape) ui.Rect {
 	if len(shape.Pts) == 0 {
 		return ui.Rect{}
 	}
-	w, h := editor.TextExtent(shape)
+	w, h := editor.Extent(shape)
 	x, y := s.toWindow(shape.Pts[0])
 	k := s.scale()
-	return ui.Rect{X: x, Y: y, W: w / k, H: h / k}
+	box := ui.Rect{X: x, Y: y, W: w / k, H: h / k}
+	if shape.Kind == editor.KindEmoji {
+		box.X -= box.W / 2
+		box.Y -= box.H / 2
+	}
+	return box
 }
 
 // editText takes the text at index off the board and types it again, at the
@@ -905,6 +1070,11 @@ func (s *selector) paintEdit(p *ui.Painter, r ui.Rect) {
 	})
 	s.placeBar(r)
 	s.bar.Draw(p, ui.Point{X: s.at[0], Y: s.at[1]}, s.hasAt)
+	if s.pickerOpen {
+		// The panel stands on the toolbar, which the user may have moved.
+		s.picker = editor.LayoutPicker(s.bar, r, s.emoji)
+		s.picker.Draw(p, ui.Point{X: s.at[0], Y: s.at[1]}, s.hasAt)
+	}
 	s.paintTip(p, r)
 }
 
@@ -1198,10 +1368,25 @@ func (s *selector) paintPicked(p *ui.Painter) {
 	if s.selected >= len(shapes) {
 		return
 	}
-	box := s.textBox(shapes[s.selected])
+	box := s.pickedBox(shapes[s.selected])
+	accent := ui.RGB(52, 199, 89)
 	p.Stroke(ui.Rect{
 		X: box.X - 3, Y: box.Y - 3, W: box.W + 6, H: box.H + 6,
-	}, ui.RGB(52, 199, 89), 0, 1.5)
+	}, accent, 0, 1.5)
+	if shapes[s.selected].Kind != editor.KindEmoji {
+		return
+	}
+	// The corners of an emoji are where a drag resizes it, so they show.
+	const radius = float32(3.5)
+	for _, corner := range [4][2]float32{
+		{box.X, box.Y}, {box.X + box.W, box.Y},
+		{box.X, box.Y + box.H}, {box.X + box.W, box.Y + box.H},
+	} {
+		p.Fill(ui.Rect{
+			X: corner[0] - radius, Y: corner[1] - radius,
+			W: 2 * radius, H: 2 * radius,
+		}, accent, radius)
+	}
 }
 
 // cropDraft returns the rectangle the pointer drags with the crop tool, in

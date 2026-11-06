@@ -105,12 +105,32 @@ func TestRecordDemo(t *testing.T) {
 	shot(3)
 
 	tool(editor.KindMosaic)
-	move(560, 360, 6)
-	tt.Press(560, 360)
+	// Across the edge of the album art and the rectangle, where the squares
+	// of the mosaic show.
+	move(420, 150, 8)
+	tt.Press(420, 150)
 	shot(1)
-	move(720, 470, 10)
-	tt.Release(720, 470)
+	move(540, 260, 8)
+	tt.Release(540, 260)
 	shot(4)
+
+	tool(editor.KindEmoji)
+	if len(s.picker.Buttons) == 0 {
+		t.Fatal("the emoji tool showed no panel")
+	}
+	// A cell puts its emoji in the middle of the selection, where the drag
+	// that follows moves it.
+	cell := s.picker.Buttons[2]
+	click(cell.Rect.X+cell.Rect.W/2, cell.Rect.Y+cell.Rect.H/2)
+	shot(2)
+	// The selection is the window the demo clicked first, whose middle is
+	// where the emoji lands.
+	move(500, 320, 5)
+	tt.Press(500, 320)
+	shot(1)
+	move(650, 430, 5)
+	tt.Release(650, 430)
+	shot(3)
 
 	button, ok := s.bar.Button(editor.CommandCopy)
 	if !ok {

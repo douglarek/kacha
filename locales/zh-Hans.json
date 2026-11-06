@@ -24,6 +24,7 @@
   "commandCopy": "复制到剪贴板",
   "captureFailed": "Kacha 无法截取屏幕",
   "toolNumber": "序号",
+  "toolEmoji": "表情：选一个，点到截图上",
   "toolCrop": "裁剪",
   "settingsTitle": "设置",
   "settingsLaunchAtLogin": "开机自启",

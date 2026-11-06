@@ -49,7 +49,20 @@ func paintShape(p *ui.Painter, s Shape, mosaic *Mosaic) {
 		mosaic.Stamp(p, s.Pts, s.Width)
 	case KindBadge:
 		paintBadge(p, s)
+	case KindEmoji:
+		paintEmoji(p, s)
 	}
+}
+
+// paintEmoji draws an emoji over the point it was placed on, in the colors of
+// its own font: the text color tints a glyph, so it stays white, which leaves
+// the emoji as it was drawn.
+func paintEmoji(p *ui.Painter, s Shape) {
+	if len(s.Pts) == 0 || s.Text == "" {
+		return
+	}
+	w, h := p.MeasureText(0, ui.Span{Text: s.Text, Size: s.Width})
+	p.Text(float32(s.Pts[0].X)-w/2, float32(s.Pts[0].Y)-h/2, s.Text, s.Width, ui.RGB(255, 255, 255))
 }
 
 // paintBadge draws the number of a badge in a filled circle centred on the

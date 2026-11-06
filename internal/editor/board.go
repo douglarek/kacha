@@ -25,6 +25,8 @@ const (
 	// KindBadge numbers what the other shapes point at: a filled circle
 	// with the number in Text.
 	KindBadge
+	// KindEmoji shows Text, an emoji, centred on the one point of Pts.
+	KindEmoji
 	// KindCrop is the toolbar's crop: a drag with it picks the part of the
 	// capture to keep, so no shape is ever drawn with it.
 	KindCrop
@@ -34,13 +36,15 @@ const (
 type Shape struct {
 	Kind  Kind
 	Color ui.Color
-	// Width is the stroke width, or for a text the height of a glyph, in
-	// pixels of the capture.
+	// Width is the stroke width, the radius a mosaic brush stamps with, or
+	// for a text or an emoji the size of its glyph, in pixels of the
+	// capture.
 	Width float32
 	// Pts are the corners of a rect, ellipse, arrow or mosaic, the path of a
-	// pen or mosaic brush, and the top left corner of a text.
+	// pen or mosaic brush, the top left corner of a text, and the point an
+	// emoji sits on.
 	Pts []image.Point
-	// Text is what a text shape shows.
+	// Text is what a text shape shows, and the emoji an emoji shape shows.
 	Text string
 }
 
@@ -63,7 +67,7 @@ func (s Shape) Empty() bool {
 	switch s.Kind {
 	case KindText:
 		return s.Text == ""
-	case KindBadge:
+	case KindBadge, KindEmoji:
 		return len(s.Pts) == 0 || s.Text == ""
 	case KindPen, KindMosaicBrush:
 		return len(s.Pts) < 2
@@ -166,11 +170,15 @@ func (b *Board) Len() int { return len(b.shapes) }
 // Shapes returns the shapes from the first to the last.
 func (b *Board) Shapes() []Shape { return b.shapes }
 
-// TextExtent returns the box a text shape covers, in the pixels of the
-// capture, which the pointer uses to tell which text it lands on. The width
-// is estimated from the glyphs, a wide one taking its height and a narrow one
-// a little over half of it.
-func TextExtent(s Shape) (float32, float32) {
+// Extent returns the box a text or an emoji covers, in the pixels of the
+// capture, which the pointer uses to tell which one it lands on. A text's
+// width is estimated from the glyphs, a wide one taking its height and a
+// narrow one a little over half of it; an emoji is a square of its size,
+// whatever its glyphs are made of.
+func Extent(s Shape) (float32, float32) {
+	if s.Kind == KindEmoji {
+		return s.Width, s.Width * 1.15
+	}
 	width := float32(0)
 	for _, r := range s.Text {
 		if r >= 0x2e80 {

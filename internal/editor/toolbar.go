@@ -25,6 +25,8 @@ const (
 	ActionTool ActionKind = iota
 	ActionColor
 	ActionWidth
+	// ActionEmoji is one of the emoji the panel the emoji tool opens shows.
+	ActionEmoji
 	ActionCommand
 )
 
@@ -34,6 +36,7 @@ type Action struct {
 	Tool    Kind
 	Color   ui.Color
 	Width   float32
+	Emoji   string
 	Command Command
 }
 
@@ -85,6 +88,19 @@ func widthNames() []string {
 // scales them to the pixels of the capture.
 func Widths() []float32 { return []float32{2, 4, 8} }
 
+// Emojis are the emoji the panel of the emoji tool offers, in the order it
+// shows them.
+func Emojis() []string {
+	return []string{
+		"😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃",
+		"😉", "😌", "😍", "🥰", "😘", "😋", "😎", "🤩", "🥳", "😏", "😢", "😭",
+		"😤", "😡", "🥺", "😱", "🤔", "😴", "🤤", "😬", "🙄", "😲", "🤯", "😷",
+		"👍", "👎", "👌", "✌️", "🙏", "👏", "🙌", "💪", "👋", "🤝", "👀", "💯",
+		"🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐷",
+		"🍎", "🍉", "🍓", "🍕", "🍔", "🍣", "🍰", "☕", "🔥", "⭐", "🎉", "❤️",
+	}
+}
+
 // Tools are the tools the toolbar offers, in the order it shows them.
 func Tools() []Tool {
 	return []Tool{
@@ -94,6 +110,7 @@ func Tools() []Tool {
 		{KindPen, IconPen, locales.ToolPen()},
 		{KindText, IconText, locales.ToolText()},
 		{KindBadge, IconBadge, locales.ToolNumber()},
+		{KindEmoji, IconEmoji, locales.ToolEmoji()},
 		{KindMosaic, IconMosaic, locales.ToolMosaic()},
 		{KindCrop, IconCrop, locales.ToolCrop()},
 	}
@@ -110,13 +127,17 @@ const (
 
 // Button is one control of the toolbar.
 type Button struct {
-	Rect     ui.Rect
-	Action   Action
-	Icon     *ui.SVG
-	Color    ui.Color
-	Width    float32
+	Rect   ui.Rect
+	Action Action
+	Icon   *ui.SVG
+	Color  ui.Color
+	// Text is drawn in place of an icon: the emoji a button stands for.
+	Text     string
 	Active   bool
 	Disabled bool
+	// Dot is the side of the dot a button that stands for a width draws, in
+	// DIPs.
+	Dot float32
 	// Tip says what the button does, when the pointer rests on it.
 	Tip string
 }
@@ -176,7 +197,7 @@ func Layout(sel, win ui.Rect, st State) Bar {
 		add(Button{
 			Rect:   ui.Rect{X: x, Y: barPad, W: itemSize, H: itemSize},
 			Action: Action{Kind: ActionWidth, Width: width},
-			Width:  width,
+			Dot:    min(width*1.8, itemSize-8),
 			Active: st.Width == width,
 			Tip:    locales.StrokeTip(widthNames()[i], int(width)),
 		})
@@ -209,6 +230,47 @@ func Layout(sel, win ui.Rect, st State) Bar {
 		buttons[i].Rect.Y += at.Y
 	}
 	return Bar{Rect: at, Buttons: buttons}
+}
+
+// pickerGap is how far the panel of emoji stands from the toolbar, in DIPs.
+const pickerGap = 8
+
+// layoutPickerCols bounds the columns of the panel of emoji, which is a
+// block of them rather than a strip across the window.
+const pickerCols = 12
+
+// LayoutPicker places the panel of emoji the toolbar shows while the emoji
+// tool is chosen: in as many columns as the window holds, over the toolbar
+// where it fits and under it where it does not.
+func LayoutPicker(bar Bar, win ui.Rect, current string) Bar {
+	emojis := Emojis()
+	cols := int((win.W - 2*barPad + gap) / (itemSize + gap))
+	cols = min(max(cols, 1), len(emojis), pickerCols)
+	rows := (len(emojis) + cols - 1) / cols
+	w := float32(cols*itemSize + (cols-1)*gap + 2*barPad)
+	h := float32(rows*itemSize + (rows-1)*gap + 2*barPad)
+	x := min(max(bar.Rect.X, win.X+pickerGap), win.X+win.W-w-pickerGap)
+	y := bar.Rect.Y - h - pickerGap
+	if y < win.Y+pickerGap {
+		y = bar.Rect.Y + bar.Rect.H + pickerGap
+	}
+	// A window too small for either side keeps the panel in it all the same.
+	y = min(max(y, win.Y+pickerGap), max(win.Y+pickerGap, win.Y+win.H-h-pickerGap))
+	buttons := make([]Button, len(emojis))
+	for i, emoji := range emojis {
+		row, col := i/cols, i%cols
+		buttons[i] = Button{
+			Rect: ui.Rect{
+				X: x + barPad + float32(col)*(itemSize+gap),
+				Y: y + barPad + float32(row)*(itemSize+gap),
+				W: itemSize, H: itemSize,
+			},
+			Action: Action{Kind: ActionEmoji, Emoji: emoji},
+			Text:   emoji,
+			Active: emoji == current,
+		}
+	}
+	return Bar{Rect: ui.Rect{X: x, Y: y, W: w, H: h}, Buttons: buttons}
 }
 
 // placeToolbar returns where a toolbar w×h goes, near sel in win.
@@ -362,8 +424,14 @@ func (b Bar) Draw(p *ui.Painter, pointer ui.Point, hovering bool) {
 				X: button.Rect.X + inner, Y: button.Rect.Y + inner,
 				W: button.Rect.W - 2*inner, H: button.Rect.H - 2*inner,
 			}, button.Color, button.Rect.W/2)
+		case button.Text != "":
+			// An emoji draws its glyph as the button's face, sized to the
+			// cell it sits in.
+			size := button.Rect.H * 0.58
+			w, h := p.MeasureText(0, ui.Span{Text: button.Text, Size: size})
+			p.Text(button.Rect.X+(button.Rect.W-w)/2, button.Rect.Y+(button.Rect.H-h)/2, button.Text, size, look.Ink)
 		default:
-			d := min(button.Width*1.8, itemSize-8)
+			d := button.Dot
 			p.Fill(ui.Rect{
 				X: button.Rect.X + (button.Rect.W-d)/2,
 				Y: button.Rect.Y + (button.Rect.H-d)/2,
