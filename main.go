@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -31,9 +32,30 @@ import (
 	"github.com/egoist/mygo"
 )
 
-// version is the release this binary was built from, which a release build
-// stamps with -ldflags -X main.version, as MYGO_LDFLAGS does.
-var version = "0.1.0"
+// config is mygo.json, which the binary carries: the version it names is the
+// one the app reports, and the one a package is named after.
+//
+//go:embed mygo.json
+var config []byte
+
+// version is the release a build stamps into the binary with -ldflags -X, as
+// MYGO_LDFLAGS does. A build that stamps none reports the version mygo.json
+// names, so that there is one place to change it.
+var version string
+
+// buildVersion returns the version of this build.
+func buildVersion() string {
+	if version != "" {
+		return version
+	}
+	var app struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(config, &app); err != nil || app.Version == "" {
+		return "unknown"
+	}
+	return app.Version
+}
 
 const usage = `kacha captures the screen and puts it on the clipboard.
 
@@ -106,7 +128,7 @@ func run(args []string) error {
 		fmt.Print(usage)
 		return nil
 	case "version":
-		fmt.Println("kacha", version)
+		fmt.Println("kacha", buildVersion())
 		return nil
 	case "settings":
 		if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
