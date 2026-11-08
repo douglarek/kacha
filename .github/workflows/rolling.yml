@@ -81,7 +81,7 @@ jobs:
           retention-days: 7
 
   linux:
-    name: Build Linux packages
+    name: Build Linux and Windows packages
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -109,12 +109,18 @@ jobs:
           PY
           grep '"version"' mygo.json
 
-      - name: Build amd64 and arm64 packages
+      - name: Install NSIS, for the Windows installer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nsis
+
+      - name: Build amd64 and arm64 packages, and the Windows ones
         env:
           MYGO_LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }}
         run: |
           go tool mygo build -platform linux/amd64
           go tool mygo build -platform linux/arm64
+          go tool mygo build -platform windows/amd64
 
       - uses: actions/upload-artifact@v4
         with:
@@ -124,6 +130,7 @@ jobs:
             dist/linux-amd64/*.deb
             dist/linux-arm64/*.tar.gz
             dist/linux-arm64/*.deb
+            dist/windows-amd64/*.exe
           if-no-files-found: error
           retention-days: 7
 
@@ -145,12 +152,12 @@ jobs:
 
       - name: Check packages
         run: |
-          count=$(find dist -type f \( -name '*.dmg' -o -name '*.tar.gz' -o -name '*.deb' \) | wc -l | tr -d ' ')
+          count=$(find dist -type f \( -name '*.dmg' -o -name '*.tar.gz' -o -name '*.deb' -o -name '*.exe' \) | wc -l | tr -d ' ')
           if [ "$count" -eq 0 ]; then
             echo "no packages were downloaded" >&2
             exit 1
           fi
-          find dist -type f \( -name '*.dmg' -o -name '*.tar.gz' -o -name '*.deb' \) -print
+          find dist -type f \( -name '*.dmg' -o -name '*.tar.gz' -o -name '*.deb' -o -name '*.exe' \) -print
 
       - name: Move the rolling tag
         run: |
@@ -167,6 +174,7 @@ jobs:
             echo
             echo "- macOS: universal DMG (ad-hoc signed, not notarized; right-click > Open if Gatekeeper blocks)"
             echo "- Linux: amd64 and arm64 tar.gz and .deb, which depend on wl-clipboard and xdg-desktop-portal"
+            echo "- Windows: the amd64 installer"
             echo
             echo "This is a prerelease: installed apps update to the tagged releases of Release, not to this."
             echo
@@ -179,7 +187,7 @@ jobs:
           gh release create latest --title "Rolling (${VERSION})" \
             --verify-tag --prerelease --notes-file /tmp/notes.md
 
-          find dist -type f \( -name '*.dmg' -o -name '*.tar.gz' -o -name '*.deb' \) -print0 \
+          find dist -type f \( -name '*.dmg' -o -name '*.tar.gz' -o -name '*.deb' -o -name '*.exe' \) -print0 \
             | xargs -0 -r gh release upload latest --clobber
 
           gh release view latest --json assets --jq '.assets[].name'
