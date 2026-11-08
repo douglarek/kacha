@@ -3,3 +3,5 @@
 /kacha-*
 *.out
 /dist
+/.gocache/
+/.gomodcache/
