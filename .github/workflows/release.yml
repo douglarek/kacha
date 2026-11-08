@@ -100,7 +100,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
-        run: go tool mygo build -platform "windows/amd64,linux/amd64,linux/arm64" -upload
+        run: go tool mygo build -platform "windows/amd64,windows/arm64,linux/amd64,linux/arm64" -upload
 
   macos:
     name: macOS
@@ -140,7 +140,7 @@ jobs:
           printf '%s\n' "$assets"
           # Every target the builds sign must publish its manifest, or its
           # apps would never update.
-          for manifest in update-darwin-universal.json update-windows-amd64.json update-linux-amd64.json update-linux-arm64.json; do
+          for manifest in update-darwin-universal.json update-windows-amd64.json update-windows-arm64.json update-linux-amd64.json update-linux-arm64.json; do
             if ! grep -qx "$manifest" <<<"$assets"; then
               echo "::error::$GITHUB_REF_NAME holds no $manifest: not publishing a release apps cannot update to"
               exit 1
