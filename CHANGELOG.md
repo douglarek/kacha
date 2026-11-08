@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.1] - 2026-11-08
+
+- The Windows builds come in arm64 as well as amd64, and a release holds
+  their installers alone, named after their version and architecture.
+
 ## [1.0.0] - 2026-11-08
 
 First release.
