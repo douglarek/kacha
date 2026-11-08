@@ -8,6 +8,7 @@ import (
 	"github.com/douglarek/kacha/internal/macwin"
 	"github.com/douglarek/kacha/locales"
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -50,7 +51,7 @@ func Show(apply func(Settings)) {
 	win = mygo.NewWindow(mygo.WindowOptions{
 		Title:   locales.SettingsTitle(),
 		Width:   460,
-		Height:  210,
+		Height:  268,
 		Content: ui.View(view),
 	})
 	win.OnClosed(func() {
@@ -85,6 +86,10 @@ func view(c *ui.Context) {
 			}
 			row(c, t, locales.SettingsShortcut(), hint, func() {
 				shortcutField(c, t)
+			})
+			divider(c, t)
+			row(c, t, locales.SettingsCheckUpdates(), locales.SettingsCheckUpdatesHint(), func() {
+				ui.Button(c, locales.SettingsCheckUpdatesButton()).OnClick(updater.CheckForUpdates)
 			})
 		})
 	})

@@ -6,6 +6,11 @@
   "copyright": "© 2026 Leo Douglas",
   "publisher": "Leo Douglas",
   "icon": "resources/icon.png",
+  "updates": {
+    "publicKey": "vX3aA78EZQg2giA7qehQMumJdgRto+UKDIWBQlKxggE=",
+    "github": "douglarek/kacha",
+    "changelog": "CHANGELOG.md"
+  },
   "out": "dist",
   "linux": {
     "maintainer": "Leo Douglas <douglarek@gmail.com>",

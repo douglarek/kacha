@@ -30,6 +30,8 @@ import (
 	"github.com/douglarek/kacha/internal/shot"
 	"github.com/douglarek/kacha/locales"
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
+	"github.com/egoist/mygo/plugins/updater/native"
 )
 
 // config is mygo.json, which the binary carries: the version it names is the
@@ -300,7 +302,16 @@ func pipe(o options) error {
 
 // gui runs the capture inside an application, which the overlay, the
 // displays and the clipboard all need.
+// useUpdates adds the update window, which checks, downloads and installs the
+// versions `mygo build` signs. It opens only when the user asks for it, from
+// the settings or the tray: kacha runs for a capture and quits, so no check
+// has a launch to run in.
+func useUpdates() {
+	mygo.Use(native.New(updater.Options{DisableAutomaticChecks: true}))
+}
+
 func gui(o options) error {
+	useUpdates()
 	overlay.Logf = logf
 	settings.Logf = logf
 	logf("start docked=%v alone=%v args=%v", docked(), openedAlone(), os.Args[1:])
@@ -410,6 +421,7 @@ func resident(o options) error {
 			Menu: mygo.NewMenu([]*mygo.MenuItem{
 				{Label: locales.TrayCapture(), Click: func(*mygo.MenuItem, *mygo.Window) { capture() }},
 				{Label: locales.SettingsMenu(), Click: func(*mygo.MenuItem, *mygo.Window) { settings.Show(apply) }},
+				updater.MenuItem(),
 				mygo.Separator(),
 				{Role: mygo.RoleQuit},
 			}),

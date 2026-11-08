@@ -481,3 +481,33 @@ func StripTaskbar() string { return In(i18n.Locale()).StripTaskbar() }
 func (msgs Messages) StripTaskbar() string {
 	return Catalog.Format(msgs.locale, "stripTaskbar", nil)
 }
+
+// SettingsCheckUpdates says "Updates"
+// in the language the app shows.
+func SettingsCheckUpdates() string { return In(i18n.Locale()).SettingsCheckUpdates() }
+
+// SettingsCheckUpdates says "Updates"
+// in the language of msgs.
+func (msgs Messages) SettingsCheckUpdates() string {
+	return Catalog.Format(msgs.locale, "settingsCheckUpdates", nil)
+}
+
+// SettingsCheckUpdatesHint says "Download and install a newer version"
+// in the language the app shows.
+func SettingsCheckUpdatesHint() string { return In(i18n.Locale()).SettingsCheckUpdatesHint() }
+
+// SettingsCheckUpdatesHint says "Download and install a newer version"
+// in the language of msgs.
+func (msgs Messages) SettingsCheckUpdatesHint() string {
+	return Catalog.Format(msgs.locale, "settingsCheckUpdatesHint", nil)
+}
+
+// SettingsCheckUpdatesButton says "Check…"
+// in the language the app shows.
+func SettingsCheckUpdatesButton() string { return In(i18n.Locale()).SettingsCheckUpdatesButton() }
+
+// SettingsCheckUpdatesButton says "Check…"
+// in the language of msgs.
+func (msgs Messages) SettingsCheckUpdatesButton() string {
+	return Catalog.Format(msgs.locale, "settingsCheckUpdatesButton", nil)
+}

@@ -81,5 +81,8 @@
   },
   "stripMenuBar": "Menu Bar",
   "stripDock": "Dock",
-  "stripTaskbar": "Taskbar"
+  "stripTaskbar": "Taskbar",
+  "settingsCheckUpdates": "Updates",
+  "settingsCheckUpdatesHint": "Download and install a newer version",
+  "settingsCheckUpdatesButton": "Check…"
 }

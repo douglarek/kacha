@@ -43,5 +43,8 @@
   "trayReadyBody": "按 {keys} 随时截图；右键托盘图标可以改设置。",
   "stripMenuBar": "菜单栏",
   "stripDock": "程序坞",
-  "stripTaskbar": "任务栏"
+  "stripTaskbar": "任务栏",
+  "settingsCheckUpdates": "更新",
+  "settingsCheckUpdatesHint": "下载并安装新版本",
+  "settingsCheckUpdatesButton": "检查…"
 }
