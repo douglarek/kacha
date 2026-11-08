@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.1.0] - unreleased
+
 ## [1.0.1] - 2026-11-08
 
 - The Windows builds come in arm64 as well as amd64, and a release holds
