@@ -36,12 +36,17 @@ pixels from its top left corner.
 .B record
 Film the screen, what the user drags, until the icon, the menu bar's item or
 the shortcut stops it, or \fB\-\-seconds\fR is up, and print where the film
-went. macOS films through \fBscreencapture\fR, which writes an H.264 film:
-kacha moves that stream into an MP4 with \fBavconvert\fR, which macOS has, and
+went. Where a key of the desktop runs it, \fB\-\-toggle\fR makes that key
+start a film and stop it: the first press films in a session of its own, and
+the second ends that film and prints its file.
+.PP
+macOS films through \fBscreencapture\fR, which writes an H.264 film: kacha
+moves that stream into an MP4 with \fBavconvert\fR, which macOS has, and
 leaves a QuickTime film where \fB\-out\fR names one with .mov. A Wayland
-session films through \fBwf-recorder\fR, which is installed apart, with the
-first codec its ffmpeg carries of libx264 (an MP4), libvpx-vp9 (a WebM) and
-libopenh264; X11, and the desktops without wf-recorder, record nothing.
+session films through \fBwf-recorder\fR, which the packages of Linux carry,
+with the first codec its ffmpeg has of libx264 (an MP4), libvpx-vp9 (a WebM)
+and libopenh264; X11 records nothing, and a desktop whose compositor is not
+wlroots, as GNOME and KDE, has nothing for it to record.
 .TP
 .B permission
 Ask the system for what a capture needs. On macOS that is the screen
@@ -103,6 +108,10 @@ Wait D, as 1.5s, before capturing.
 .BI \-\-seconds " N"
 Stop a recording after N seconds, 0 for as long as it takes the user to stop
 it.
+.TP
+.B \-\-toggle
+Start a film, or stop the one the first press started, for a key of the
+desktop that has no terminal to end a film in.
 .TP
 .BI \-\-clicks= BOOL
 Mark where the pointer clicked in a recording. True by default; macOS marks

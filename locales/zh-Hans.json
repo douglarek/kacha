@@ -54,5 +54,6 @@
   "settingsStopShortcut": "停止录制快捷键",
   "settingsStopShortcutHint": "录制时按下就结束，不用碰菜单栏。",
   "trayRecordingTip": "Kacha · 录制中，点一下停止",
-  "trayStopRecord": "停止录制"
+  "trayStopRecord": "停止录制",
+  "recordStarted": "录制中，再按一次快捷键停止"
 }

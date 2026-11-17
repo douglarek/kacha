@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -72,6 +73,7 @@ Usage:
   kacha full               capture the whole display under the pointer
   kacha area X,Y,WxH       capture a rectangle of that display, in DIPs
   kacha record             film the screen, what the drag picks, until stopped
+  kacha record --toggle    film until the command runs again, as a key does
   kacha settings           open the settings: the shortcuts and opening at login
   kacha permission         ask macOS for permission to record the screen
   kacha version            print the version
@@ -85,6 +87,7 @@ Flags:
   --delay D        wait D before capturing, as 1.5s
   --area SPEC      the rectangle of the area and record commands
   --seconds N      stop a recording after N seconds (default: until stopped)
+  --toggle         start a recording, or stop the one a first run started
   --clicks=BOOL    mark the pointer's clicks in a recording (default true)
 
 Env:
@@ -117,6 +120,11 @@ type options struct {
 	delay   time.Duration
 	seconds int
 	clicks  bool
+	// toggle is a film the key that runs the command again stops, and
+	// detached is the film that key started, which runs in a session of its
+	// own.
+	toggle   bool
+	detached bool
 }
 
 func run(args []string) error {
@@ -150,6 +158,7 @@ func run(args []string) error {
 	case "permission":
 		return permission()
 	}
+	record.Logf = logf
 	o := options{cmd: cmd, copy: true}
 	if cmd == "area" && len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		o.area, args = args[0], args[1:]
@@ -165,6 +174,8 @@ func run(args []string) error {
 	fs.DurationVar(&o.delay, "delay", 0, "wait before capturing")
 	fs.IntVar(&o.seconds, "seconds", 0, "stop a recording after this long")
 	fs.BoolVar(&o.clicks, "clicks", true, "mark the pointer's clicks in a recording")
+	fs.BoolVar(&o.toggle, "toggle", false, "start a recording, or stop the one running")
+	fs.BoolVar(&o.detached, "detached", false, "the recording a toggle started")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -183,6 +194,9 @@ func run(args []string) error {
 	}
 	if o.stdout {
 		return pipe(o)
+	}
+	if o.toggle {
+		return toggleRecording(o)
 	}
 	return gui(o)
 }
@@ -705,23 +719,91 @@ func shoot(o options) error {
 // recordScreen films the screen, what --area names or what the user drags,
 // until its time is up or the command is interrupted, and prints the file.
 func recordScreen(o options) error {
+	if o.detached {
+		// A film a key started has no terminal to say where it went: it
+		// leaves the file to the key that stops it, and says both in a
+		// balloon.
+		defer record.Unmark()
+	}
 	rec, err := film(o)
 	if err != nil {
 		return err
+	}
+	if o.detached {
+		notify(locales.RecordStarted(), "")
 	}
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(stop)
 	select {
 	case <-rec.Done():
+		logf("record: the recorder ended by itself")
 	case <-stop:
+		logf("record: stopping")
 	}
 	path, err := rec.Stop()
+	logf("record: stopped, path=%q err=%v", path, err)
 	if err != nil {
 		return err
 	}
+	if o.detached {
+		record.Settled(path)
+		notify(locales.RecordSaved(), path)
+		return nil
+	}
 	fmt.Println(path)
 	return nil
+}
+
+// toggleRecording films until the command runs again, which a key of the
+// desktop runs: the film itself goes on in a session of its own, so that the
+// key returns at once, and a second run stops it.
+func toggleRecording(o options) error {
+	if pid, ok := record.Filming(); ok {
+		logf("record: toggle stops %d", pid)
+		path, err := record.StopFilming(pid)
+		logf("record: toggle stopped, path=%q err=%v", path, err)
+		if err != nil {
+			return err
+		}
+		if path != "" {
+			fmt.Println(path)
+		}
+		return nil
+	}
+	if !record.Supported() {
+		return record.ErrUnsupported
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("kacha: record: %w", err)
+	}
+	args := []string{"record", "--detached"}
+	if o.out != "" {
+		args = append(args, "-o", o.out)
+	}
+	if o.area != "" {
+		args = append(args, "--area", o.area)
+	}
+	if o.seconds > 0 {
+		args = append(args, "--seconds", strconv.Itoa(o.seconds))
+	}
+	if !o.clicks {
+		args = append(args, "--clicks=false")
+	}
+	pid, err := record.Detach(exe, args)
+	logf("record: toggle starts %d: %v", pid, err)
+	return err
+}
+
+// notify shows a balloon, for a launch that has no window to say it in.
+func notify(title, body string) {
+	note := mygo.NewNotification(mygo.NotificationOptions{ID: "record", Title: title, Body: body})
+	go func() {
+		if err := note.Show(); err != nil {
+			logf("notify: %v", err)
+		}
+	}()
 }
 
 // film shows what to record, and returns the recording once it is rolling.

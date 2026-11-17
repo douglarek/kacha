@@ -104,5 +104,9 @@
   "@trayRecordingTip": {
     "description": "The tooltip of the menu bar icon while a film is being made."
   },
-  "trayStopRecord": "Stop recording"
+  "trayStopRecord": "Stop recording",
+  "recordStarted": "Recording: run the key again to stop",
+  "@recordStarted": {
+    "description": "The balloon a recording started from a shortcut shows."
+  }
 }

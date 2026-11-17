@@ -607,3 +607,17 @@ func TrayStopRecord() string { return In(i18n.Locale()).TrayStopRecord() }
 func (msgs Messages) TrayStopRecord() string {
 	return Catalog.Format(msgs.locale, "trayStopRecord", nil)
 }
+
+// RecordStarted says "Recording: run the key again to stop"
+// in the language the app shows.
+//
+// The balloon a recording started from a shortcut shows.
+func RecordStarted() string { return In(i18n.Locale()).RecordStarted() }
+
+// RecordStarted says "Recording: run the key again to stop"
+// in the language of msgs.
+//
+// The balloon a recording started from a shortcut shows.
+func (msgs Messages) RecordStarted() string {
+	return Catalog.Format(msgs.locale, "recordStarted", nil)
+}

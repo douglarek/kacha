@@ -21,10 +21,23 @@
     ],
     "webview": false,
     "command": "kacha",
-    "depends": [
-      "wl-clipboard",
-      "xdg-desktop-portal"
-    ]
+    "depends": {
+      "deb": [
+        "wl-clipboard",
+        "wf-recorder",
+        "xdg-desktop-portal"
+      ],
+      "rpm": [
+        "wl-clipboard",
+        "wf-recorder",
+        "xdg-desktop-portal"
+      ],
+      "arch": [
+        "wl-clipboard",
+        "wf-recorder",
+        "xdg-desktop-portal"
+      ]
+    }
   },
   "macos": {},
   "i18n": {
