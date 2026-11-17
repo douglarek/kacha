@@ -597,3 +597,13 @@ func TrayRecordingTip() string { return In(i18n.Locale()).TrayRecordingTip() }
 func (msgs Messages) TrayRecordingTip() string {
 	return Catalog.Format(msgs.locale, "trayRecordingTip", nil)
 }
+
+// TrayStopRecord says "Stop recording"
+// in the language the app shows.
+func TrayStopRecord() string { return In(i18n.Locale()).TrayStopRecord() }
+
+// TrayStopRecord says "Stop recording"
+// in the language of msgs.
+func (msgs Messages) TrayStopRecord() string {
+	return Catalog.Format(msgs.locale, "trayStopRecord", nil)
+}

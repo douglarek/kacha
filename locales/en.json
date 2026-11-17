@@ -103,5 +103,6 @@
   "trayRecordingTip": "Kacha · recording, click to stop",
   "@trayRecordingTip": {
     "description": "The tooltip of the menu bar icon while a film is being made."
-  }
+  },
+  "trayStopRecord": "Stop recording"
 }

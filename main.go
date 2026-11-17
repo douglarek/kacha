@@ -476,15 +476,22 @@ func resident(o options) error {
 			}
 		}()
 	}
-	menuFor := func() *mygo.Menu {
-		return mygo.NewMenu([]*mygo.MenuItem{
+	menuFor := func(filming bool) *mygo.Menu {
+		items := []*mygo.MenuItem{
 			{Label: locales.TrayCapture(), Click: func(*mygo.MenuItem, *mygo.Window) { capture() }},
-			{Label: locales.TrayRecord(), Click: func(*mygo.MenuItem, *mygo.Window) { startRecord() }},
-			{Label: locales.SettingsMenu(), Click: func(*mygo.MenuItem, *mygo.Window) { settings.Show(apply) }},
+		}
+		if filming {
+			items = append(items, &mygo.MenuItem{Label: locales.TrayStopRecord(), Click: func(*mygo.MenuItem, *mygo.Window) { stopRecord() }})
+		} else {
+			items = append(items, &mygo.MenuItem{Label: locales.TrayRecord(), Click: func(*mygo.MenuItem, *mygo.Window) { startRecord() }})
+		}
+		items = append(items,
+			&mygo.MenuItem{Label: locales.SettingsMenu(), Click: func(*mygo.MenuItem, *mygo.Window) { settings.Show(apply) }},
 			updater.MenuItem(),
 			mygo.Separator(),
-			{Role: mygo.RoleQuit},
-		})
+			&mygo.MenuItem{Role: mygo.RoleQuit},
+		)
+		return mygo.NewMenu(items)
 	}
 	showFilm := func(rec *record.Recorder) {
 		filmMu.Lock()
@@ -500,13 +507,20 @@ func resident(o options) error {
 		if rec == nil {
 			bar.SetTitle("")
 			bar.SetToolTip(locales.AppName())
-			bar.SetMenu(menuFor())
+			bar.SetMenu(menuFor(false))
+			return
+		}
+		bar.SetToolTip(locales.TrayRecordingTip())
+		if runtime.GOOS != "darwin" {
+			// The panels of the other systems open the menu on a click, and
+			// one without items would leave the film with no way out of the
+			// menu: a film stops by its item there.
+			bar.SetMenu(menuFor(true))
 			return
 		}
 		// A film stops from the icon itself: a menu takes the click that
 		// would stop it, and shows in the film it stops.
 		bar.SetMenu(nil)
-		bar.SetToolTip(locales.TrayRecordingTip())
 		offClick = bar.OnClick(stopRecord)
 		go func() {
 			began := time.Now()
@@ -587,7 +601,7 @@ func resident(o options) error {
 			Icon:           trayIcon(),
 			IconIsTemplate: trayIsTemplate(),
 			ToolTip:        locales.AppName(),
-			Menu:           menuFor(),
+			Menu:           menuFor(false),
 		})
 		if err != nil {
 			logf("tray: %v", err)

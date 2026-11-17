@@ -64,20 +64,6 @@ func Start(o Options) (*Recorder, error) {
 	return r, nil
 }
 
-// Stop ends the film, which screencapture writes out as an interrupt comes,
-// and waits for the file.
-func (r *Recorder) Stop() (string, error) {
-	select {
-	case <-r.done:
-		return r.file, r.err
-	default:
-	}
-	if err := r.cmd.Process.Signal(os.Interrupt); err != nil {
-		return r.file, fmt.Errorf("kacha: stop recording: %w", err)
-	}
-	return r.Wait()
-}
-
 // files returns the file the caller asked for, and the one screencapture
 // writes first: a QuickTime film under the same name, which avconvert moves
 // into the MP4 that plays wherever a film is played.

@@ -4,12 +4,15 @@ package record
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
+	"os"
 	"os/exec"
 )
 
-// ErrUnsupported reports that this system has no recorder the app can drive.
-var ErrUnsupported = errors.New("kacha: recording needs macOS, which films the screen of its own")
+// ErrUnsupported reports that no recorder is here to film the screen: macOS
+// films with screencapture, and a Wayland session with wf-recorder.
+var ErrUnsupported = errors.New("kacha: no recorder for the screen is here: macOS films with screencapture, a Wayland session with wf-recorder")
 
 // Options are what to film, and where the film goes.
 type Options struct {
@@ -44,6 +47,24 @@ type Recorder struct {
 	err  error
 	// said is what the recorder wrote as it worked, which a failure tells.
 	said bytes.Buffer
+}
+
+// Stop ends the film, which both recorders write out as an interrupt comes,
+// and waits for the file.
+func (r *Recorder) Stop() (string, error) {
+	select {
+	case <-r.done:
+		return r.file, r.err
+	default:
+	}
+	if r.cmd == nil || r.cmd.Process == nil {
+		return "", ErrUnsupported
+	}
+	// A recorder that is already gone has its film written.
+	if err := r.cmd.Process.Signal(os.Interrupt); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		return r.file, fmt.Errorf("kacha: stop recording: %w", err)
+	}
+	return r.Wait()
 }
 
 // Done reports when the film is over, by the time it was given or by Stop.
