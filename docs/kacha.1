@@ -43,10 +43,18 @@ the second ends that film and prints its file.
 macOS films through \fBscreencapture\fR, which writes an H.264 film: kacha
 moves that stream into an MP4 with \fBavconvert\fR, which macOS has, and
 leaves a QuickTime film where \fB\-out\fR names one with .mov. A Wayland
-session films through \fBwf-recorder\fR, which the packages of Linux carry,
-with the first codec its ffmpeg has of libx264 (an MP4), libvpx-vp9 (a WebM)
-and libopenh264; X11 records nothing, and a desktop whose compositor is not
-wlroots, as GNOME and KDE, has nothing for it to record.
+session asks its portal to share a screen or a window, which the desktop
+picks in a window of its own, and films that PipeWire stream with
+\fBgst\-launch\-1.0\fR, which writes an MP4 with openh264 (H.264) or with
+x264, and a WebM with vp9. The picker is the desktop's, so what it shares is
+a screen or a window whole, not the rectangle of \fB\-\-area\fR; X11 records
+nothing.
+.PP
+The packages of GStreamer are no dependency of kacha, as a capture and its
+annotations need none of them: a film wants \fBpipewiresrc\fR of
+pipewire-gstreamer, \fBvideocrop\fR and \fBmp4mux\fR of the good plugins,
+\fBh264parse\fR of the bad ones, and an encoder, either openh264 or x264.
+A film that cannot start names the element it misses.
 .TP
 .B permission
 Ask the system for what a capture needs. On macOS that is the screen
@@ -115,11 +123,12 @@ desktop that has no terminal to end a film in.
 .TP
 .BI \-\-clicks= BOOL
 Mark where the pointer clicked in a recording. True by default; macOS marks
-them, and wf-recorder has no mark of them.
+them, and a film of the portal has no mark of them.
 .TP
 .BI \-\-area " X,Y,WxH"
-The rectangle the \fBarea\fR command captures, and the \fBrecord\fR command
-films, in device independent pixels from the display's top left corner.
+The rectangle the \fBarea\fR command captures, in device independent pixels
+from the display's top left corner. A film of a Wayland session takes no
+rectangle: the desktop shares a screen or a window whole.
 .SH ENVIRONMENT
 .TP
 .B KACHA_DIR

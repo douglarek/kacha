@@ -11,14 +11,19 @@ import (
 )
 
 // ErrUnsupported reports that no recorder is here to film the screen: macOS
-// films with screencapture, and a Wayland session with wf-recorder.
-var ErrUnsupported = errors.New("kacha: no recorder for the screen is here: macOS films with screencapture, a Wayland session with wf-recorder")
+// films with screencapture, and a Wayland session through the portal of its
+// desktop, whose stream GStreamer records.
+var ErrUnsupported = errors.New("kacha: no recorder for the screen is here: macOS films with screencapture, a Wayland session through its portal with gst-launch-1.0")
 
 // Options are what to film, and where the film goes.
 type Options struct {
 	// Rect is what to film, in the DIPs of the screen, empty for the whole
 	// of it.
 	Rect image.Rectangle
+	// Display is the screen Rect is on, in DIPs, empty where the recorder
+	// needs it not: a film of a Wayland session crops the stream of the
+	// screen that the desktop shares to it.
+	Display image.Rectangle
 	// Seconds ends the film after this long, 0 for as long as it takes the
 	// user to stop it.
 	Seconds int

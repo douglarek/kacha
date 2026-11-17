@@ -827,6 +827,7 @@ func film(o options) (*record.Recorder, error) {
 	}
 	return record.Start(record.Options{
 		Rect:    rect,
+		Display: image.Rect(place.X, place.Y, place.X+place.Width, place.Y+place.Height),
 		Seconds: o.seconds,
 		Clicks:  o.clicks,
 		Out:     o.out,
