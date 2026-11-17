@@ -36,7 +36,9 @@ func StopFilming(pid int) (string, error) {
 		ClearState()
 		return "", errors.New("kacha: no film is being made")
 	}
-	if err := syscall.Kill(pid, syscall.SIGINT); err != nil {
+	// SIGUSR1, which the film handles as a stop: SIGINT would quit the app
+	// of the film before it says where the film went.
+	if err := syscall.Kill(pid, syscall.SIGUSR1); err != nil {
 		Logf("record: stop: signal %d: %v", pid, err)
 		return "", fmt.Errorf("kacha: stop recording: %w", err)
 	}

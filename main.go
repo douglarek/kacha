@@ -25,7 +25,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/douglarek/kacha/internal/capture"
@@ -755,8 +754,11 @@ func recordScreen(o options) error {
 	if o.detached {
 		notify(locales.RecordStarted(), "")
 	}
+	// The key that started the film stops it with SIGUSR1, which no app quits
+	// on: an interrupt quits mygo's event loop, and the notification that
+	// says where the film went is no notification then.
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(stop, stopSignals...)
 	defer signal.Stop(stop)
 	select {
 	case <-rec.Done():
