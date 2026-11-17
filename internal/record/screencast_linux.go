@@ -24,7 +24,16 @@ const (
 	portalScreencast = "org.freedesktop.portal.ScreenCast"
 	portalRequest    = "org.freedesktop.portal.Request"
 	requestPrefix    = "/org/freedesktop/portal/desktop/request/"
+
+	// portalRegistry names the app to the portal, which asks the desktop for
+	// a name to show in its picker: without it, the request is one of an
+	// unknown application.
+	portalRegistry = "org.freedesktop.host.portal.Registry.Register"
 )
+
+// appID is the app as the portal knows it, the name of its desktop entry,
+// which the packages of kacha install as kacha.desktop.
+const appID = "kacha"
 
 // ErrDenied reports that the user turned the film down, at the picker of the
 // desktop.
@@ -45,6 +54,24 @@ func (s *share) Close() {
 	}
 	_ = s.conn.Close()
 	s.conn = nil
+}
+
+// Register tells the portal which app asks, by the name of its desktop entry,
+// which the desktop shows in its picker where the app is named at all. It
+// goes before the first call of the portal, which names the connection once:
+// a later one is answered with the app id the portal derived by itself, which
+// is none for an app it does not know.
+func Register(ctx context.Context) {
+	conn, err := dbus.SessionBus()
+	if err != nil {
+		Logf("record: portal registry: %v", err)
+		return
+	}
+	err = conn.Object(portalBus, portalObjectPath).
+		CallWithContext(ctx, portalRegistry, 0, appID, map[string]dbus.Variant{}).Err
+	if err != nil {
+		Logf("record: portal registry: %v", err)
+	}
 }
 
 // openShare asks the desktop to share a screen or a window, and returns the

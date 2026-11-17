@@ -364,6 +364,10 @@ func useUpdates() {
 
 func gui(o options) error {
 	useUpdates()
+	// The portal names the app in the picker it shows for a film, by the id
+	// the app registered before its first call: register here, before the
+	// capture of the overlay, which is a call of the portal already.
+	record.Register(context.Background())
 	overlay.Logf = logf
 	record.Logf = logf
 	settings.Logf = logf

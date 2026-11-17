@@ -2,6 +2,8 @@
 
 package record
 
+import "context"
+
 import (
 	"fmt"
 	"os"
@@ -114,3 +116,7 @@ func flags(o Options) []string {
 	}
 	return args
 }
+
+// Register names the app to the portal of the session, which only a Wayland
+// session has.
+func Register(context.Context) {}
