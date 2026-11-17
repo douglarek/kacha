@@ -68,6 +68,18 @@ type Window struct {
 	Round bool
 }
 
+// Pick shows the capture, lets the user drag what to record, and returns
+// where that is in the DIPs of the window, which the caller places on the
+// screen.
+func Pick(o Options) (region.Rect, error) {
+	s := newSelector(o, nil)
+	s.pickOnly = true
+	if err := run(s); err != nil {
+		return region.Rect{}, err
+	}
+	return s.picked, nil
+}
+
 // Select runs the selection and the editor over o, and blocks until the user
 // finishes or cancels.
 // done runs on the main thread before the window closes, so that it may use
@@ -226,6 +238,11 @@ type selector struct {
 	// escapedAt is when Escape last left something, which a press that comes
 	// twice at once is told by.
 	escapedAt time.Time
+	// pickOnly is whether the drag picks what a recording films rather than
+	// a capture to edit, and picked is what it picked, in the DIPs of the
+	// window.
+	pickOnly bool
+	picked   region.Rect
 }
 
 // asRGBA returns img as the premultiplied RGBA whose pixels mygo shows as
@@ -365,6 +382,13 @@ func (s *selector) trackSelection(root ui.Element) {
 		}
 		if s.cropRect().Empty() {
 			s.finish(nil, ChoiceBoth, ErrCanceled)
+			return
+		}
+		if s.pickOnly {
+			// The drag is all of it: what it picked is what the caller
+			// records, and no tool comes over it.
+			s.picked = s.rawSelection()
+			s.finish(nil, ChoiceBoth, nil)
 			return
 		}
 		s.startEditing()

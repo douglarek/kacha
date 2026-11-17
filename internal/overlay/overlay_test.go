@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/douglarek/kacha/internal/editor"
+	"github.com/douglarek/kacha/internal/region"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
@@ -417,6 +418,46 @@ func TestDraggingPaintsWithTheBrush(t *testing.T) {
 
 func TestEscapeCancels(t *testing.T) {
 	s, tt := open(t, nil)
+	tt.Key(0, ui.KeyEscape)
+
+	select {
+	case err := <-s.results:
+		if !errors.Is(err, ErrCanceled) {
+			t.Errorf("err = %v, want ErrCanceled", err)
+		}
+	default:
+		t.Fatal("Escape reported nothing")
+	}
+}
+
+func TestPickEndsAtTheDrag(t *testing.T) {
+	s, tt := open(t, nil)
+	s.pickOnly = true
+	selectArea(t, tt)
+
+	if !s.finished {
+		t.Fatal("the drag left the window open")
+	}
+	if want := (region.Rect{X: 100, Y: 100, W: 200, H: 150}); s.picked != want {
+		t.Errorf("picked %+v, want %+v", s.picked, want)
+	}
+	// What comes next is a film of that part, not a tool over it.
+	if s.phase != phaseSelect {
+		t.Errorf("phase = %v, want the selection alone", s.phase)
+	}
+	select {
+	case err := <-s.results:
+		if err != nil {
+			t.Errorf("err = %v, want none", err)
+		}
+	default:
+		t.Fatal("nothing was reported")
+	}
+}
+
+func TestPickCancelsWithEscape(t *testing.T) {
+	s, tt := open(t, nil)
+	s.pickOnly = true
 	tt.Key(0, ui.KeyEscape)
 
 	select {
@@ -951,5 +992,26 @@ func TestTheCaptureGoesAsAnRGBA(t *testing.T) {
 	rgba := image.NewRGBA(image.Rect(0, 0, 4, 3))
 	if again := asRGBA(rgba); again != image.Image(rgba) {
 		t.Error("an RGBA was copied too")
+	}
+}
+
+func TestPickTakesTheWindowClicked(t *testing.T) {
+	src := screen(1200, 800)
+	window := image.Rect(200, 100, 600, 400)
+	s := newSelector(Options{
+		Image:   src,
+		Source:  src.Bounds(),
+		Place:   mygo.Rectangle{Width: 600, Height: 400},
+		Windows: []Window{{Rect: window, App: "Test"}},
+	}, nil)
+	s.pickOnly = true
+	tt := ui.NewTester(s.view, 600, 400)
+
+	// The window covers 100,50 to 300,200 in the window's DIPs.
+	tt.Press(150, 120)
+	tt.Release(150, 120)
+
+	if want := (region.Rect{X: 100, Y: 50, W: 200, H: 150}); s.picked != want {
+		t.Errorf("picked %+v, want the window at %+v", s.picked, want)
 	}
 }

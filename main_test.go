@@ -2,6 +2,8 @@ package main
 
 import (
 	"image"
+	"os"
+	"runtime"
 	"testing"
 
 	"github.com/egoist/mygo"
@@ -42,5 +44,52 @@ func TestStripsInFindsTheDock(t *testing.T) {
 	}
 	if want := image.Rect(0, 1024, 1710, 1107); dock.Rect != want {
 		t.Errorf("dock = %v, want %v", dock.Rect, want)
+	}
+}
+
+func TestRecordRectFromTheArea(t *testing.T) {
+	place := mygo.Rectangle{X: 10, Y: 20, Width: 800, Height: 600}
+	got, err := recordRect(options{area: "0,0,200x100"}, nil, image.Rectangle{}, place, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := image.Rect(10, 20, 210, 120); got != want {
+		t.Errorf("rect = %v, want %v", got, want)
+	}
+	if _, err := recordRect(options{area: "nonsense"}, nil, image.Rectangle{}, place, nil); err == nil {
+		t.Error("an area of nonsense was taken")
+	}
+}
+
+func TestOpenedAlone(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
+		t.Skip("a desktop opens an app on macOS and Windows alone")
+	}
+	args := os.Args
+	defer func() { os.Args = args }()
+
+	os.Args = []string{"kacha"}
+	t.Setenv("__CFBundleIdentifier", "vibe.kacha")
+	if !openedAlone() {
+		t.Error("an app opened with no arguments is not alone")
+	}
+
+	// The desktop numbers the process as it opens an app, which the app
+	// takes as no argument at all.
+	os.Args = []string{"kacha", "-psn_0_4321"}
+	if !openedAlone() {
+		t.Error("the process number of the desktop counted as an argument")
+	}
+
+	os.Args = []string{"kacha", "region"}
+	if openedAlone() {
+		t.Error("a command counted as no argument")
+	}
+
+	// A capture asked for from a shell takes one.
+	os.Args = []string{"kacha"}
+	t.Setenv("__CFBundleIdentifier", "")
+	if openedAlone() {
+		t.Error("a copy run from a shell counted as opened by the desktop")
 	}
 }

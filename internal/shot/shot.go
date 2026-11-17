@@ -12,8 +12,9 @@ import (
 	"time"
 )
 
-// layout names a capture after the moment it was taken.
-const layout = "kacha-2006-01-02-15-04-05.png"
+// layout names a capture after the moment it was taken, before the extension
+// its kind of file takes.
+const layout = "kacha-2006-01-02-15-04-05"
 
 // DefaultDir returns $KACHA_DIR, or the Pictures folder of the user.
 func DefaultDir() string {
@@ -30,14 +31,13 @@ func DefaultDir() string {
 // Write saves img at out, which names a file, a directory, or nothing for
 // DefaultDir, and returns the path it wrote.
 func Write(img image.Image, out string) (string, error) {
-	path, err := resolve(out)
+	path, err := Path(out, ".png")
 	if err != nil {
 		return "", err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", fmt.Errorf("kacha: create %s: %w", filepath.Dir(path), err)
 	}
-	path = unique(path)
 	file, err := os.Create(path)
 	if err != nil {
 		return "", fmt.Errorf("kacha: create %s: %w", path, err)
@@ -63,9 +63,21 @@ func Copy(img image.Image) error {
 	return copyPNG(buf.Bytes())
 }
 
-// resolve turns out into the file the capture goes to.
-func resolve(out string) (string, error) {
-	name := time.Now().Format(layout)
+// Path returns the file a capture called out goes to: a directory, or
+// nothing, names it after the moment with ext for its extension, and a number
+// keeps it from covering a file another capture wrote.
+func Path(out, ext string) (string, error) {
+	path, err := resolve(out, ext)
+	if err != nil {
+		return "", err
+	}
+	return unique(path), nil
+}
+
+// resolve turns out into the file a capture goes to, with ext for the
+// extension of one named without it.
+func resolve(out string, ext string) (string, error) {
+	name := time.Now().Format(layout) + ext
 	if out == "" {
 		return filepath.Join(DefaultDir(), name), nil
 	}
@@ -77,7 +89,7 @@ func resolve(out string) (string, error) {
 		return filepath.Join(path, name), nil
 	}
 	if filepath.Ext(path) == "" {
-		path += ".png"
+		path += ext
 	}
 	return path, nil
 }

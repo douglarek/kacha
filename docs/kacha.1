@@ -3,7 +3,7 @@
 kacha \- capture the screen on Linux and macOS
 .SH SYNOPSIS
 .B kacha
-[\fBregion\fR|\fBfull\fR|\fBarea \fIX,Y,WxH\fR|\fBversion\fR]
+[\fBregion\fR|\fBfull\fR|\fBarea \fIX,Y,WxH\fR|\fBrecord\fR|\fBversion\fR]
 [\fIflags\fR]
 .SH DESCRIPTION
 .B kacha
@@ -32,6 +32,14 @@ Capture the display under the pointer without a selection window.
 .BI area " X,Y,WxH"
 Capture a rectangle of the display under the pointer, in device independent
 pixels from its top left corner.
+.TP
+.B record
+Film the screen, what the user drags, until the menu bar's item or the
+shortcut stops it, or \fB\-\-seconds\fR is up, and print where the film went.
+macOS films through \fBscreencapture\fR, which writes an H.264 film: kacha
+moves that stream into an MP4 with \fBavconvert\fR, which macOS has, and leaves
+a QuickTime film where \fB\-out\fR names one with .mov. No other system has a
+recorder kacha can drive yet.
 .TP
 .B permission
 Ask the system for what a capture needs. On macOS that is the screen
@@ -89,6 +97,17 @@ names where to write.
 .TP
 .BI \-\-delay " D"
 Wait D, as 1.5s, before capturing.
+.TP
+.BI \-\-seconds " N"
+Stop a recording after N seconds, 0 for as long as it takes the user to stop
+it.
+.TP
+.BI \-\-clicks= BOOL
+Mark where the pointer clicked in a recording. True by default.
+.TP
+.BI \-\-area " X,Y,WxH"
+The rectangle the \fBarea\fR command captures, and the \fBrecord\fR command
+films, in device independent pixels from the display's top left corner.
 .SH ENVIRONMENT
 .TP
 .B KACHA_DIR

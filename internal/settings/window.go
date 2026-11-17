@@ -24,10 +24,12 @@ var stopShortcut = func() { mygo.GlobalShortcut.UnregisterAll() }
 var syncLoginItem = SyncLoginItem
 
 var (
-	mu        sync.Mutex
-	win       *mygo.Window
-	value     Settings
-	recording bool
+	mu    sync.Mutex
+	win   *mygo.Window
+	value Settings
+	// picking is the shortcut the field takes keys for, "capture" or "stop",
+	// and empty while it takes none.
+	picking   string
 	stopWatch func()
 	onApply   func(Settings)
 )
@@ -47,17 +49,17 @@ func Show(apply func(Settings)) {
 	value = Load()
 	// The user may have turned the login item off in System Settings.
 	value.LaunchAtLogin = LaunchAtLogin()
-	recording = false
+	picking = ""
 	win = mygo.NewWindow(mygo.WindowOptions{
 		Title:   locales.SettingsTitle(),
 		Width:   460,
-		Height:  268,
+		Height:  324,
 		Content: ui.View(view),
 	})
 	win.OnClosed(func() {
 		// A window closed while its shortcut was being picked leaves the
 		// app without one; it gets the one it has back.
-		if recording {
+		if picking != "" {
 			cancelRecording()
 		}
 	})
@@ -81,11 +83,19 @@ func view(c *ui.Context) {
 			})
 			divider(c, t)
 			hint := locales.SettingsShortcutHint()
-			if recording {
+			if picking == "capture" {
 				hint = locales.SettingsPressKeysHint()
 			}
 			row(c, t, locales.SettingsShortcut(), hint, func() {
-				shortcutField(c, t)
+				shortcutField(c, t, "capture")
+			})
+			divider(c, t)
+			hint = locales.SettingsStopShortcutHint()
+			if picking == "stop" {
+				hint = locales.SettingsPressKeysHint()
+			}
+			row(c, t, locales.SettingsStopShortcut(), hint, func() {
+				shortcutField(c, t, "stop")
 			})
 			divider(c, t)
 			row(c, t, locales.SettingsCheckUpdates(), locales.SettingsCheckUpdatesHint(), func() {
@@ -113,8 +123,8 @@ func divider(c *ui.Context, t *ui.Theme) {
 
 // shortcutField draws the shortcut, or the empty field that waits for a new
 // one, which a click empties and the keys fill.
-func shortcutField(c *ui.Context, t *ui.Theme) {
-	if recording {
+func shortcutField(c *ui.Context, t *ui.Theme, which string) {
+	if picking == which {
 		field := ui.Box(c).Width(fieldWidth()).Height(fieldHeight).
 			Background(t.Background).Border(2, t.Accent).Radius(7)
 		field.Children(func() {
@@ -132,7 +142,7 @@ func shortcutField(c *ui.Context, t *ui.Theme) {
 		})
 		return
 	}
-	ui.Button(c, shortcutKeys(value.Shortcut)).Width(fieldWidth()).OnClick(startRecording)
+	ui.Button(c, shortcutKeys(shortcutOf(which))).Width(fieldWidth()).OnClick(func() { startRecording(which) })
 }
 
 // The field of the shortcut is as large as the button of the shortcut, and
@@ -151,8 +161,8 @@ func fieldWidth() float32 {
 // startRecording empties the field of the shortcut and takes the next
 // combination pressed, which the app does not hold as a global one until
 // then.
-func startRecording() {
-	recording = true
+func startRecording(which string) {
+	picking = which
 	stopShortcut()
 	stopWatch = WatchKeys(func(combo string, escape bool) bool {
 		if !pick(combo, escape) {
@@ -184,16 +194,42 @@ func cancelRecording() {
 func pick(combo string, escape bool) bool {
 	switch {
 	case escape:
-		recording = false
+		picking = ""
 		save()
-	case valid(combo):
-		recording = false
-		value.Shortcut = combo
+	case valid(combo) && picking != "" && !taken(combo):
+		setShortcut(picking, combo)
+		picking = ""
 		save()
 	default:
 		return false
 	}
 	return true
+}
+
+// setShortcut puts an accelerator where the shortcut it is for lives.
+func setShortcut(which, combo string) {
+	if which == "stop" {
+		value.StopShortcut = combo
+		return
+	}
+	value.Shortcut = combo
+}
+
+// shortcutOf returns the accelerator the settings hold for which.
+func shortcutOf(which string) string {
+	if which == "stop" {
+		return value.StopShortcut
+	}
+	return value.Shortcut
+}
+
+// taken reports whether the other shortcut already holds combo, which one
+// key cannot do two things at once for.
+func taken(combo string) bool {
+	if picking == "stop" {
+		return combo == value.Shortcut
+	}
+	return combo == value.StopShortcut
 }
 
 // valid tells whether combo has the modifier a global shortcut needs, and a

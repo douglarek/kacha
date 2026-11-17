@@ -348,11 +348,11 @@ func (msgs Messages) SettingsLaunchAtLogin() string {
 	return Catalog.Format(msgs.locale, "settingsLaunchAtLogin", nil)
 }
 
-// SettingsShortcut says "Shortcut"
+// SettingsShortcut says "Capture shortcut"
 // in the language the app shows.
 func SettingsShortcut() string { return In(i18n.Locale()).SettingsShortcut() }
 
-// SettingsShortcut says "Shortcut"
+// SettingsShortcut says "Capture shortcut"
 // in the language of msgs.
 func (msgs Messages) SettingsShortcut() string {
 	return Catalog.Format(msgs.locale, "settingsShortcut", nil)
@@ -510,4 +510,90 @@ func SettingsCheckUpdatesButton() string { return In(i18n.Locale()).SettingsChec
 // in the language of msgs.
 func (msgs Messages) SettingsCheckUpdatesButton() string {
 	return Catalog.Format(msgs.locale, "settingsCheckUpdatesButton", nil)
+}
+
+// TrayRecord says "Record"
+// in the language the app shows.
+func TrayRecord() string { return In(i18n.Locale()).TrayRecord() }
+
+// TrayRecord says "Record"
+// in the language of msgs.
+func (msgs Messages) TrayRecord() string {
+	return Catalog.Format(msgs.locale, "trayRecord", nil)
+}
+
+// RecordHint says "Drag to pick what to record · Esc to cancel"
+// in the language the app shows.
+//
+// The line over the capture while a recording picks its part.
+func RecordHint() string { return In(i18n.Locale()).RecordHint() }
+
+// RecordHint says "Drag to pick what to record · Esc to cancel"
+// in the language of msgs.
+//
+// The line over the capture while a recording picks its part.
+func (msgs Messages) RecordHint() string {
+	return Catalog.Format(msgs.locale, "recordHint", nil)
+}
+
+// RecordFailed says "Kacha could not record the screen"
+// in the language the app shows.
+func RecordFailed() string { return In(i18n.Locale()).RecordFailed() }
+
+// RecordFailed says "Kacha could not record the screen"
+// in the language of msgs.
+func (msgs Messages) RecordFailed() string {
+	return Catalog.Format(msgs.locale, "recordFailed", nil)
+}
+
+// RecordSaved says "Recording saved"
+// in the language the app shows.
+func RecordSaved() string { return In(i18n.Locale()).RecordSaved() }
+
+// RecordSaved says "Recording saved"
+// in the language of msgs.
+func (msgs Messages) RecordSaved() string {
+	return Catalog.Format(msgs.locale, "recordSaved", nil)
+}
+
+// SettingsStopShortcut says "Stop recording"
+// in the language the app shows.
+//
+// The title of the row that picks the shortcut ending a film.
+func SettingsStopShortcut() string { return In(i18n.Locale()).SettingsStopShortcut() }
+
+// SettingsStopShortcut says "Stop recording"
+// in the language of msgs.
+//
+// The title of the row that picks the shortcut ending a film.
+func (msgs Messages) SettingsStopShortcut() string {
+	return Catalog.Format(msgs.locale, "settingsStopShortcut", nil)
+}
+
+// SettingsStopShortcutHint says "Press it while a film is being made, and the menu bar need not show in it."
+// in the language the app shows.
+//
+// The line under the stop recording shortcut.
+func SettingsStopShortcutHint() string { return In(i18n.Locale()).SettingsStopShortcutHint() }
+
+// SettingsStopShortcutHint says "Press it while a film is being made, and the menu bar need not show in it."
+// in the language of msgs.
+//
+// The line under the stop recording shortcut.
+func (msgs Messages) SettingsStopShortcutHint() string {
+	return Catalog.Format(msgs.locale, "settingsStopShortcutHint", nil)
+}
+
+// TrayRecordingTip says "Kacha · recording, click to stop"
+// in the language the app shows.
+//
+// The tooltip of the menu bar icon while a film is being made.
+func TrayRecordingTip() string { return In(i18n.Locale()).TrayRecordingTip() }
+
+// TrayRecordingTip says "Kacha · recording, click to stop"
+// in the language of msgs.
+//
+// The tooltip of the menu bar icon while a film is being made.
+func (msgs Messages) TrayRecordingTip() string {
+	return Catalog.Format(msgs.locale, "trayRecordingTip", nil)
 }

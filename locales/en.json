@@ -60,7 +60,7 @@
   "toolCrop": "Crop",
   "settingsTitle": "Settings",
   "settingsLaunchAtLogin": "Open at login",
-  "settingsShortcut": "Shortcut",
+  "settingsShortcut": "Capture shortcut",
   "settingsPressKeys": "Press keys…",
   "settingsShortcutHint": "Press it anywhere to take a capture.",
   "settingsMenu": "Settings…",
@@ -84,5 +84,24 @@
   "stripTaskbar": "Taskbar",
   "settingsCheckUpdates": "Updates",
   "settingsCheckUpdatesHint": "Download and install a newer version",
-  "settingsCheckUpdatesButton": "Check…"
+  "settingsCheckUpdatesButton": "Check…",
+  "trayRecord": "Record",
+  "recordHint": "Drag to pick what to record · Esc to cancel",
+  "@recordHint": {
+    "description": "The line over the capture while a recording picks its part."
+  },
+  "recordFailed": "Kacha could not record the screen",
+  "recordSaved": "Recording saved",
+  "settingsStopShortcut": "Stop recording",
+  "@settingsStopShortcut": {
+    "description": "The title of the row that picks the shortcut ending a film."
+  },
+  "settingsStopShortcutHint": "Press it while a film is being made, and the menu bar need not show in it.",
+  "@settingsStopShortcutHint": {
+    "description": "The line under the stop recording shortcut."
+  },
+  "trayRecordingTip": "Kacha · recording, click to stop",
+  "@trayRecordingTip": {
+    "description": "The tooltip of the menu bar icon while a film is being made."
+  }
 }

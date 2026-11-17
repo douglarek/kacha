@@ -31,7 +31,7 @@
   "toolCrop": "裁剪",
   "settingsTitle": "设置",
   "settingsLaunchAtLogin": "开机自启",
-  "settingsShortcut": "快捷键",
+  "settingsShortcut": "截图快捷键",
   "settingsPressKeys": "按下组合键…",
   "settingsShortcutHint": "在任意位置按下就开始截图。",
   "settingsMenu": "设置…",
@@ -46,5 +46,12 @@
   "stripTaskbar": "任务栏",
   "settingsCheckUpdates": "更新",
   "settingsCheckUpdatesHint": "下载并安装新版本",
-  "settingsCheckUpdatesButton": "检查…"
+  "settingsCheckUpdatesButton": "检查…",
+  "trayRecord": "录制",
+  "recordHint": "拖拽选区开始录制 · Esc 取消",
+  "recordFailed": "Kacha 无法录制屏幕",
+  "recordSaved": "录制已保存",
+  "settingsStopShortcut": "停止录制快捷键",
+  "settingsStopShortcutHint": "录制时按下就结束，不用碰菜单栏。",
+  "trayRecordingTip": "Kacha · 录制中，点一下停止"
 }

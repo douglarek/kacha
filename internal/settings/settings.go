@@ -11,18 +11,24 @@ import (
 // DefaultShortcut starts a capture until the user picks another.
 const DefaultShortcut = "CmdOrCtrl+Shift+S"
 
+// DefaultStopShortcut ends a film until the user picks another.
+const DefaultStopShortcut = "CmdOrCtrl+Shift+X"
+
 // Settings are the choices of the settings window.
 type Settings struct {
 	// Shortcut starts a capture from anywhere, in the syntax of menu
 	// accelerators, e.g. "CmdOrCtrl+Shift+S".
 	Shortcut string `json:"shortcut"`
+	// StopShortcut ends a film being made, which the app holds while one is
+	// made and no longer: the menu bar need not be touched to stop.
+	StopShortcut string `json:"stopShortcut"`
 	// LaunchAtLogin opens the app when the user logs in.
 	LaunchAtLogin bool `json:"launchAtLogin"`
 }
 
 // Load returns the settings on the disk, with the defaults filled in.
 func Load() Settings {
-	s := Settings{Shortcut: DefaultShortcut}
+	s := Settings{Shortcut: DefaultShortcut, StopShortcut: DefaultStopShortcut}
 	file, err := os.Open(path())
 	if err != nil {
 		return s
@@ -31,6 +37,9 @@ func Load() Settings {
 	_ = json.NewDecoder(file).Decode(&s)
 	if s.Shortcut == "" {
 		s.Shortcut = DefaultShortcut
+	}
+	if s.StopShortcut == "" {
+		s.StopShortcut = DefaultStopShortcut
 	}
 	return s
 }

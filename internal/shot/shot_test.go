@@ -58,11 +58,39 @@ func TestResolveExpandsHome(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home) // what Windows reads as the home
-	got, err := resolve("~/shot.png")
+	got, err := resolve("~/shot.png", ".png")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := filepath.Join(home, "shot.png"); got != want {
 		t.Errorf("resolve = %q, want %q", got, want)
+	}
+}
+
+func TestPathNamesAFilm(t *testing.T) {
+	dir := t.TempDir()
+	got, err := Path(dir, ".mov")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(got) != dir {
+		t.Errorf("path = %q, want a file in %q", got, dir)
+	}
+	if filepath.Ext(got) != ".mov" {
+		t.Errorf("path = %q, want a .mov", got)
+	}
+	if !strings.HasPrefix(filepath.Base(got), "kacha-") {
+		t.Errorf("path = %q, want it named after the moment", got)
+	}
+	// A film does not cover the one already there.
+	if err := os.WriteFile(got, []byte("film"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	next, err := Path(got, ".mov")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next == got {
+		t.Error("a second film took the name of the first")
 	}
 }

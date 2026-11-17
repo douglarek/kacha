@@ -15,16 +15,21 @@ import (
 	"image/png"
 	"math"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/douglarek/kacha/internal/capture"
 	"github.com/douglarek/kacha/internal/editor"
 	"github.com/douglarek/kacha/internal/overlay"
+	"github.com/douglarek/kacha/internal/record"
 	"github.com/douglarek/kacha/internal/region"
 	"github.com/douglarek/kacha/internal/settings"
 	"github.com/douglarek/kacha/internal/shot"
@@ -66,7 +71,8 @@ Usage:
   kacha [region]           capture the screen, pick a part, annotate it
   kacha full               capture the whole display under the pointer
   kacha area X,Y,WxH       capture a rectangle of that display, in DIPs
-  kacha settings           open the settings: the shortcut and opening at login
+  kacha record             film the screen, what the drag picks, until stopped
+  kacha settings           open the settings: the shortcuts and opening at login
   kacha permission         ask macOS for permission to record the screen
   kacha version            print the version
 
@@ -77,7 +83,9 @@ Flags:
   --copy=BOOL      copy the capture to the clipboard (default true)
   --save=BOOL      write the capture to the disk (default false)
   --delay D        wait D before capturing, as 1.5s
-  --area SPEC      the rectangle of the area command
+  --area SPEC      the rectangle of the area and record commands
+  --seconds N      stop a recording after N seconds (default: until stopped)
+  --clicks=BOOL    mark the pointer's clicks in a recording (default true)
 
 Env:
   KACHA_DIR        where captures go unless --out says otherwise
@@ -107,6 +115,8 @@ type options struct {
 	save    bool
 	saveSet bool
 	delay   time.Duration
+	seconds int
+	clicks  bool
 }
 
 func run(args []string) error {
@@ -153,6 +163,8 @@ func run(args []string) error {
 	fs.BoolVar(&o.copy, "copy", true, "copy the capture to the clipboard")
 	fs.BoolVar(&o.save, "save", false, "write the capture to the disk")
 	fs.DurationVar(&o.delay, "delay", 0, "wait before capturing")
+	fs.IntVar(&o.seconds, "seconds", 0, "stop a recording after this long")
+	fs.BoolVar(&o.clicks, "clicks", true, "mark the pointer's clicks in a recording")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -160,7 +172,7 @@ func run(args []string) error {
 		o.saveSet = o.saveSet || f.Name == "save"
 	})
 	switch o.cmd {
-	case "region", "full":
+	case "region", "full", "record":
 	case "area":
 		if o.area == "" {
 			return errors.New("kacha: area takes X,Y,WxH")
@@ -177,9 +189,30 @@ func run(args []string) error {
 
 // docked reports whether this copy runs as the app of a Dock, rather than
 // from a terminal, where it takes one capture and leaves.
-// openedAlone reports whether a desktop opened the app, with no arguments
-// at all, which is how Windows opens what a click on it starts.
-func openedAlone() bool { return runtime.GOOS == "windows" && len(os.Args) == 1 }
+// openedAlone reports whether a desktop opened the app, with no arguments at
+// all, which is how a click on it, or a login, starts it: the app then stays
+// in the tray rather than taking a capture no one asked for.
+func openedAlone() bool {
+	switch runtime.GOOS {
+	case "windows":
+		return len(os.Args) == 1
+	case "darwin":
+		if !docked() {
+			// A capture asked for from a shell takes one, as it always has.
+			return false
+		}
+		for _, arg := range os.Args[1:] {
+			// The desktop numbers the process as it opens an app, which is
+			// no command of the user's.
+			if strings.HasPrefix(arg, "-psn_") {
+				continue
+			}
+			return false
+		}
+		return true
+	}
+	return false
+}
 
 func docked() bool {
 	return os.Getenv("__CFBundleIdentifier") == "vibe.kacha"
@@ -313,6 +346,7 @@ func useUpdates() {
 func gui(o options) error {
 	useUpdates()
 	overlay.Logf = logf
+	record.Logf = logf
 	settings.Logf = logf
 	logf("start docked=%v alone=%v args=%v", docked(), openedAlone(), os.Args[1:])
 	// A tool of the menu bar takes no place in the Dock, and, what matters,
@@ -338,7 +372,11 @@ func gui(o options) error {
 					mygo.App.Quit()
 				}
 			}()
-			err := shoot(o)
+			take := shoot
+			if o.cmd == "record" {
+				take = recordScreen
+			}
+			err := take(o)
 			if err != nil {
 				logf("error: %v", err)
 			}
@@ -401,33 +439,155 @@ func resident(o options) error {
 			}
 		}()
 	}
-	apply := func(s settings.Settings) {
-		mygo.GlobalShortcut.UnregisterAll()
-		if err := mygo.GlobalShortcut.Register(s.Shortcut, capture); err != nil {
-			logf("shortcut %s: %v", s.Shortcut, err)
-		}
-	}
 	mygo.App.OnSecondInstance(func(args []string, dir string) {
 		// A click on the app again says where the app is, which is where it
 		// was: the tray.
 		logf("second instance: %v", args)
 		tell()
 	})
+	// The film being made, if any, and the menu bar item that makes one and
+	// stops it: a film runs until the menu stops it, or the app quits.
+	var (
+		filmMu      sync.Mutex
+		filmNow     *record.Recorder
+		bar         *mygo.Tray
+		startRecord func()
+		stopRecord  func()
+		shortcuts   func()
+		apply       func(settings.Settings)
+		// offClick drops the listener the icon has while a film is made.
+		offClick func()
+	)
+	filming := func() *record.Recorder {
+		filmMu.Lock()
+		defer filmMu.Unlock()
+		return filmNow
+	}
+	say := func(title, body string) {
+		note := mygo.NewNotification(mygo.NotificationOptions{ID: "record", Title: title, Body: body})
+		go func() {
+			if err := note.Show(); err != nil {
+				logf("notify: %v", err)
+			}
+		}()
+	}
+	menuFor := func() *mygo.Menu {
+		return mygo.NewMenu([]*mygo.MenuItem{
+			{Label: locales.TrayCapture(), Click: func(*mygo.MenuItem, *mygo.Window) { capture() }},
+			{Label: locales.TrayRecord(), Click: func(*mygo.MenuItem, *mygo.Window) { startRecord() }},
+			{Label: locales.SettingsMenu(), Click: func(*mygo.MenuItem, *mygo.Window) { settings.Show(apply) }},
+			updater.MenuItem(),
+			mygo.Separator(),
+			{Role: mygo.RoleQuit},
+		})
+	}
+	showFilm := func(rec *record.Recorder) {
+		filmMu.Lock()
+		filmNow = rec
+		filmMu.Unlock()
+		if bar == nil {
+			return
+		}
+		if offClick != nil {
+			offClick()
+			offClick = nil
+		}
+		if rec == nil {
+			bar.SetTitle("")
+			bar.SetToolTip(locales.AppName())
+			bar.SetMenu(menuFor())
+			return
+		}
+		// A film stops from the icon itself: a menu takes the click that
+		// would stop it, and shows in the film it stops.
+		bar.SetMenu(nil)
+		bar.SetToolTip(locales.TrayRecordingTip())
+		offClick = bar.OnClick(stopRecord)
+		go func() {
+			began := time.Now()
+			for {
+				select {
+				case <-rec.Done():
+					return
+				case <-time.After(time.Second):
+					passed := time.Since(began)
+					bar.SetTitle(fmt.Sprintf("● %d:%02d", int(passed.Minutes()), int(passed.Seconds())%60))
+				}
+			}
+		}()
+	}
+	// shortcuts registers what the keys do now: a capture always takes one,
+	// and a film takes its own while it is being made, so that a stop need
+	// not go through the menu bar that shows in the film.
+	shortcuts = func() {
+		mygo.GlobalShortcut.UnregisterAll()
+		if err := mygo.GlobalShortcut.Register(prefs.Shortcut, capture); err != nil {
+			logf("shortcut %s: %v", prefs.Shortcut, err)
+		}
+		if filming() == nil || prefs.StopShortcut == "" {
+			return
+		}
+		if err := mygo.GlobalShortcut.Register(prefs.StopShortcut, stopRecord); err != nil {
+			logf("shortcut %s to stop: %v", prefs.StopShortcut, err)
+		}
+	}
+	startRecord = func() {
+		if filming() != nil || !busy.CompareAndSwap(false, true) {
+			return
+		}
+		go func() {
+			defer busy.Store(false)
+			defer func() {
+				if r := recover(); r != nil {
+					logf("panic: %v\n%s", r, debug.Stack())
+					mygo.Dialog.Error(locales.RecordFailed(), fmt.Sprint(r))
+				}
+			}()
+			logf("record start")
+			rec, err := film(options{cmd: "record", clicks: true})
+			if err != nil {
+				if !errors.Is(err, overlay.ErrCanceled) {
+					logf("record: %v", err)
+					mygo.Dialog.Error(locales.RecordFailed(), err.Error())
+				}
+				return
+			}
+			showFilm(rec)
+			shortcuts()
+			path, err := rec.Wait()
+			showFilm(nil)
+			shortcuts()
+			if err != nil {
+				logf("record: %v", err)
+				mygo.Dialog.Error(locales.RecordFailed(), err.Error())
+				return
+			}
+			logf("record done: %s", path)
+			say(locales.RecordSaved(), path)
+			reveal(path)
+			debug.FreeOSMemory()
+		}()
+	}
+	stopRecord = func() {
+		if rec := filming(); rec != nil {
+			go func() { _, _ = rec.Stop() }()
+		}
+	}
+	apply = func(s settings.Settings) {
+		prefs = s
+		shortcuts()
+	}
 	mygo.App.WhenReady(func() {
-		if _, err := mygo.NewTray(mygo.TrayOptions{
+		created, err := mygo.NewTray(mygo.TrayOptions{
 			Icon:           trayIcon(),
 			IconIsTemplate: trayIsTemplate(),
 			ToolTip:        locales.AppName(),
-			Menu: mygo.NewMenu([]*mygo.MenuItem{
-				{Label: locales.TrayCapture(), Click: func(*mygo.MenuItem, *mygo.Window) { capture() }},
-				{Label: locales.SettingsMenu(), Click: func(*mygo.MenuItem, *mygo.Window) { settings.Show(apply) }},
-				updater.MenuItem(),
-				mygo.Separator(),
-				{Role: mygo.RoleQuit},
-			}),
-		}); err != nil {
+			Menu:           menuFor(),
+		})
+		if err != nil {
 			logf("tray: %v", err)
 		}
+		bar = created
 		apply(prefs)
 		switch {
 		case openedAlone():
@@ -436,16 +596,39 @@ func resident(o options) error {
 			tell()
 		case o.cmd == "settings":
 			settings.Show(apply)
+		case o.cmd == "record":
+			// A film the app takes starts from its menu, which also stops it.
+			startRecord()
 		default:
 			capture()
+		}
+	})
+	mygo.App.OnQuit(func() {
+		// A film goes on in screencapture, which would outlive the app: the
+		// quit stops it, and the file is written as a stop would.
+		if rec := filming(); rec != nil {
+			_, _ = rec.Stop()
 		}
 	})
 	mygo.App.OnWindowAllClosed(func() {})
 	return mygo.App.Run()
 }
 
-// shoot captures the screen and delivers what the command asks for.
-func shoot(o options) error {
+// reveal shows the file a film went to in the Finder, which is where the
+// user looks for it.
+func reveal(path string) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	if err := exec.Command("open", "-R", path).Run(); err != nil {
+		logf("reveal: %v", err)
+	}
+}
+
+// scene captures the screen and returns what a window over it shows: the
+// image, the part of it the window shows, where the window goes, and what a
+// click on it could pick.
+func scene(o options) (image.Image, image.Rectangle, mygo.Rectangle, []overlay.Window, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	img, err := grab(ctx, o)
@@ -455,22 +638,35 @@ func shoot(o options) error {
 		img, err = capture.Grab(ctx)
 	}
 	if err != nil {
-		return err
+		return nil, image.Rectangle{}, mygo.Rectangle{}, nil, err
 	}
 	displays := mygo.Screen.Displays()
 	if len(displays) == 0 {
-		return errors.New("kacha: the desktop reports no display")
+		return nil, image.Rectangle{}, mygo.Rectangle{}, nil, errors.New("kacha: the desktop reports no display")
 	}
 	target := mygo.Screen.DisplayNearestPoint(mygo.Screen.CursorScreenPoint())
 	union := captured(displays, img, target)
 	part := region.Place(union, dipRect(target), img.Bounds())
 	place := mygo.Rectangle(target.Bounds)
+	windows := append(stripsIn(target, part), windowsIn(dipRect(target), part)...)
+	return img, part, place, windows, nil
+}
 
+// shoot captures the screen and delivers what the command asks for.
+func shoot(o options) error {
+	img, part, place, windows, err := scene(o)
+	if err != nil {
+		return err
+	}
+	display := region.Rect{
+		X: float64(place.X), Y: float64(place.Y),
+		W: float64(place.Width), H: float64(place.Height),
+	}
 	switch o.cmd {
 	case "full":
 		return deliver(o, capture.Crop(img, part), overlay.ChoiceBoth)
 	case "area":
-		crop, err := area(img, part, dipRect(target), o.area)
+		crop, err := area(img, part, display, o.area)
 		if err != nil {
 			return err
 		}
@@ -480,11 +676,89 @@ func shoot(o options) error {
 			Image:   img,
 			Source:  part,
 			Place:   place,
-			Windows: append(stripsIn(target, part), windowsIn(dipRect(target), part)...),
+			Windows: windows,
 		}, func(finished image.Image, choice overlay.Choice) error {
 			return deliver(o, finished, choice)
 		})
 	}
+}
+
+// recordScreen films the screen, what --area names or what the user drags,
+// until its time is up or the command is interrupted, and prints the file.
+func recordScreen(o options) error {
+	rec, err := film(o)
+	if err != nil {
+		return err
+	}
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(stop)
+	select {
+	case <-rec.Done():
+	case <-stop:
+	}
+	path, err := rec.Stop()
+	if err != nil {
+		return err
+	}
+	fmt.Println(path)
+	return nil
+}
+
+// film shows what to record, and returns the recording once it is rolling.
+func film(o options) (*record.Recorder, error) {
+	if !record.Supported() {
+		return nil, record.ErrUnsupported
+	}
+	img, part, place, windows, err := scene(o)
+	if err != nil {
+		return nil, err
+	}
+	rect, err := recordRect(o, img, part, place, windows)
+	if err != nil {
+		return nil, err
+	}
+	logf("record: filming %v, the screen at %v", rect, place)
+	if o.area == "" {
+		// The window the drag was made in is on its way out, and a film
+		// should not open with it.
+		time.Sleep(150 * time.Millisecond)
+	}
+	return record.Start(record.Options{
+		Rect:    rect,
+		Seconds: o.seconds,
+		Clicks:  o.clicks,
+		Out:     o.out,
+	})
+}
+
+// recordRect returns what to film, in the DIPs of the screen: the rectangle
+// --area names, or what the user drags over the capture.
+func recordRect(o options, img image.Image, part image.Rectangle, place mygo.Rectangle, windows []overlay.Window) (image.Rectangle, error) {
+	if o.area != "" {
+		r, err := region.Area(o.area)
+		if err != nil {
+			return image.Rectangle{}, err
+		}
+		return image.Rect(
+			place.X+int(r.X), place.Y+int(r.Y),
+			place.X+int(r.X+r.W), place.Y+int(r.Y+r.H),
+		), nil
+	}
+	picked, err := overlay.Pick(overlay.Options{
+		Image:   img,
+		Source:  part,
+		Place:   place,
+		Hint:    locales.RecordHint(),
+		Windows: windows,
+	})
+	if err != nil {
+		return image.Rectangle{}, err
+	}
+	return image.Rect(
+		place.X+int(picked.X), place.Y+int(picked.Y),
+		place.X+int(picked.X+picked.W), place.Y+int(picked.Y+picked.H),
+	), nil
 }
 
 // grab captures the screen once the delay is over.
