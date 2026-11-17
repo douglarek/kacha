@@ -192,16 +192,21 @@ func run(args []string) error {
 // openedAlone reports whether a desktop opened the app, with no arguments at
 // all, which is how a click on it, or a login, starts it: the app then stays
 // in the tray rather than taking a capture no one asked for.
-func openedAlone() bool {
-	switch runtime.GOOS {
+func openedAlone() bool { return openedByDesktop(runtime.GOOS, os.Args[1:], docked()) }
+
+// openedByDesktop tells whether a launch of goos, whose arguments are args,
+// is a desktop opening the app: Windows opens one with no arguments, and
+// macOS with the process number it gives it, of a copy it knows as a bundle.
+func openedByDesktop(goos string, args []string, bundle bool) bool {
+	switch goos {
 	case "windows":
-		return len(os.Args) == 1
+		return len(args) == 0
 	case "darwin":
-		if !docked() {
+		if !bundle {
 			// A capture asked for from a shell takes one, as it always has.
 			return false
 		}
-		for _, arg := range os.Args[1:] {
+		for _, arg := range args {
 			// The desktop numbers the process as it opens an app, which is
 			// no command of the user's.
 			if strings.HasPrefix(arg, "-psn_") {

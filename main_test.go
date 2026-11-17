@@ -2,8 +2,6 @@ package main
 
 import (
 	"image"
-	"os"
-	"runtime"
 	"testing"
 
 	"github.com/egoist/mygo"
@@ -61,35 +59,27 @@ func TestRecordRectFromTheArea(t *testing.T) {
 	}
 }
 
-func TestOpenedAlone(t *testing.T) {
-	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
-		t.Skip("a desktop opens an app on macOS and Windows alone")
+func TestOpenedByDesktop(t *testing.T) {
+	// What a desktop does to start an app, on the systems that start one:
+	// the test runs wherever, and reads the arguments of every system.
+	tests := []struct {
+		goos   string
+		args   []string
+		bundle bool
+		want   bool
+	}{
+		{"windows", nil, false, true},
+		{"windows", []string{"region"}, false, false},
+		{"darwin", nil, true, true},
+		{"darwin", []string{"-psn_0_4321"}, true, true},
+		{"darwin", []string{"region"}, true, false},
+		{"darwin", nil, false, false},
+		{"linux", nil, false, false},
+		{"linux", []string{"region"}, false, false},
 	}
-	args := os.Args
-	defer func() { os.Args = args }()
-
-	os.Args = []string{"kacha"}
-	t.Setenv("__CFBundleIdentifier", "vibe.kacha")
-	if !openedAlone() {
-		t.Error("an app opened with no arguments is not alone")
-	}
-
-	// The desktop numbers the process as it opens an app, which the app
-	// takes as no argument at all.
-	os.Args = []string{"kacha", "-psn_0_4321"}
-	if !openedAlone() {
-		t.Error("the process number of the desktop counted as an argument")
-	}
-
-	os.Args = []string{"kacha", "region"}
-	if openedAlone() {
-		t.Error("a command counted as no argument")
-	}
-
-	// A capture asked for from a shell takes one.
-	os.Args = []string{"kacha"}
-	t.Setenv("__CFBundleIdentifier", "")
-	if openedAlone() {
-		t.Error("a copy run from a shell counted as opened by the desktop")
+	for _, tt := range tests {
+		if got := openedByDesktop(tt.goos, tt.args, tt.bundle); got != tt.want {
+			t.Errorf("openedByDesktop(%s, %v, bundle=%v) = %v, want %v", tt.goos, tt.args, tt.bundle, got, tt.want)
+		}
 	}
 }
