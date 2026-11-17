@@ -14,6 +14,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -381,6 +382,7 @@ func gui(o options) error {
 	if docked() || o.cmd == "settings" || openedAlone() {
 		return resident(o)
 	}
+	watchFilmNote()
 	errs := make(chan error, 1)
 	mygo.App.WhenReady(func() {
 		go func() {
@@ -481,14 +483,6 @@ func resident(o options) error {
 		filmMu.Lock()
 		defer filmMu.Unlock()
 		return filmNow
-	}
-	say := func(title, body string) {
-		note := mygo.NewNotification(mygo.NotificationOptions{ID: "record", Title: title, Body: body})
-		go func() {
-			if err := note.Show(); err != nil {
-				logf("notify: %v", err)
-			}
-		}()
 	}
 	menuFor := func(filming bool) *mygo.Menu {
 		items := []*mygo.MenuItem{
@@ -596,8 +590,7 @@ func resident(o options) error {
 				return
 			}
 			logf("record done: %s", path)
-			say(locales.RecordSaved(), path)
-			reveal(path)
+			filmSaved(path)
 			debug.FreeOSMemory()
 		}()
 	}
@@ -644,17 +637,47 @@ func resident(o options) error {
 		}
 	})
 	mygo.App.OnWindowAllClosed(func() {})
+	watchFilmNote()
 	return mygo.App.Run()
 }
 
 // reveal shows the file a film went to in the Finder, which is where the
 // user looks for it.
 func reveal(path string) {
-	if runtime.GOOS != "darwin" {
+	var err error
+	switch runtime.GOOS {
+	case "darwin":
+		err = exec.Command("open", "-R", path).Run()
+	case "linux":
+		err = showInFileManager(path)
+	default:
 		return
 	}
-	if err := exec.Command("open", "-R", path).Run(); err != nil {
+	if err != nil {
 		logf("reveal: %v", err)
+	}
+}
+
+// showInFileManager asks the file manager of the session to show path, which
+// selects it where the desktop answers org.freedesktop.FileManager1, and
+// opens the folder it is in where it does not.
+func showInFileManager(path string) error {
+	if err := exec.Command("gdbus", showItemsArgs(path)...).Run(); err == nil {
+		return nil
+	}
+	return exec.Command("xdg-open", filepath.Dir(path)).Run()
+}
+
+// showItemsArgs returns the call of org.freedesktop.FileManager1.ShowItems
+// that shows path: the file managers read it as the file to select.
+func showItemsArgs(path string) []string {
+	uri := (&url.URL{Scheme: "file", Path: path}).String()
+	return []string{
+		"call", "--session",
+		"--dest", "org.freedesktop.FileManager1",
+		"--object-path", "/org/freedesktop/FileManager1",
+		"--method", "org.freedesktop.FileManager1.ShowItems",
+		"[" + strconv.Quote(uri) + "]", "",
 	}
 }
 
@@ -748,7 +771,14 @@ func recordScreen(o options) error {
 	}
 	if o.detached {
 		record.Settled(path)
-		notify(locales.RecordSaved(), path)
+		filmSaved(path)
+		// The notification says where the film went, and its click opens
+		// the folder: the launch keeps running for it, as Linux hands the
+		// click to the app that showed the notification.
+		select {
+		case <-filmClick:
+		case <-time.After(filmNoteWait):
+		}
 		return nil
 	}
 	fmt.Println(path)
@@ -794,6 +824,75 @@ func toggleRecording(o options) error {
 	pid, err := record.Detach(exe, args)
 	logf("record: toggle starts %d: %v", pid, err)
 	return err
+}
+
+// filmNote is the ID of the notification that says where a film went: a
+// click on it opens the folder the film is in.
+const filmNote = "film"
+
+// filmNoteWait is how long a launch that filmed keeps running for a click on
+// that notification: Linux hands the click to a process that runs, and the
+// launch quits once the film is written.
+const filmNoteWait = 20 * time.Second
+
+// filmClick is told when the user clicks the notification of a film.
+var filmClick = make(chan struct{}, 1)
+
+// filmPath is where the last film went.
+var filmPath struct {
+	sync.Mutex
+	path string
+}
+
+// rememberFilm keeps where a film went, for the click of its notification.
+func rememberFilm(path string) {
+	filmPath.Lock()
+	defer filmPath.Unlock()
+	filmPath.path = path
+}
+
+// lastFilm returns where the last film went, "" without one.
+func lastFilm() string {
+	filmPath.Lock()
+	defer filmPath.Unlock()
+	return filmPath.path
+}
+
+// watchFilmNote opens the folder of the last film when its notification is
+// clicked. It is registered before the app runs, as a click of a notification
+// of an earlier launch arrives then.
+func watchFilmNote() {
+	mygo.App.OnNotificationClick(func(id string) {
+		if id != filmNote {
+			return
+		}
+		path := lastFilm()
+		if path == "" {
+			return
+		}
+		logf("film note clicked: %s", path)
+		reveal(path)
+		select {
+		case filmClick <- struct{}{}:
+		default:
+		}
+	})
+}
+
+// filmSaved says where a film went, in a notification whose click opens the
+// folder it is in.
+func filmSaved(path string) {
+	rememberFilm(path)
+	note := mygo.NewNotification(mygo.NotificationOptions{
+		ID:    filmNote,
+		Title: locales.RecordSaved(),
+		Body:  path,
+	})
+	go func() {
+		if err := note.Show(); err != nil {
+			logf("notify: %v", err)
+		}
+	}()
 }
 
 // notify shows a balloon, for a launch that has no window to say it in.

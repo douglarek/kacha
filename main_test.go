@@ -2,6 +2,7 @@ package main
 
 import (
 	"image"
+	"strings"
 	"testing"
 
 	"github.com/egoist/mygo"
@@ -42,6 +43,27 @@ func TestStripsInFindsTheDock(t *testing.T) {
 	}
 	if want := image.Rect(0, 1024, 1710, 1107); dock.Rect != want {
 		t.Errorf("dock = %v, want %v", dock.Rect, want)
+	}
+}
+
+func TestRememberingWhereAFilmWent(t *testing.T) {
+	if got := lastFilm(); got != "" {
+		t.Fatalf("a film is remembered before one is made: %q", got)
+	}
+	rememberFilm("/home/me/Shots/film.mp4")
+	if got := lastFilm(); got != "/home/me/Shots/film.mp4" {
+		t.Errorf("last film = %q, want the one just made", got)
+	}
+}
+
+func TestShowItemsAsksForTheFile(t *testing.T) {
+	got := strings.Join(showItemsArgs("/home/me/Shots/a b.mp4"), " ")
+	want := `call --session --dest org.freedesktop.FileManager1 ` +
+		`--object-path /org/freedesktop/FileManager1 ` +
+		`--method org.freedesktop.FileManager1.ShowItems ` +
+		`["file:///home/me/Shots/a%20b.mp4"] `
+	if got != want {
+		t.Errorf("args = %q, want %q", got, want)
 	}
 }
 
