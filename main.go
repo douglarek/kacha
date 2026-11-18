@@ -833,10 +833,12 @@ func recordScreen(o options) error {
 
 	// The tray goes up before the film does, as the area the user picks and
 	// the screen the desktop shares hold a film back: its click ends the
-	// film, or the launch that has not started one yet.
+	// film, or the launch that has not started one yet, and a film a
+	// terminal made has it too, which says it records where a terminal
+	// cannot.
 	fromTray := make(chan struct{}, 1)
 	var tray *mygo.Tray
-	if o.detached && runtime.GOOS == "linux" {
+	if runtime.GOOS == "linux" {
 		tray = filmTray(func() {
 			logf("record: the tray stops the film")
 			select {
