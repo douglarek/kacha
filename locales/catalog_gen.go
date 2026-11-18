@@ -621,3 +621,13 @@ func RecordStarted() string { return In(i18n.Locale()).RecordStarted() }
 func (msgs Messages) RecordStarted() string {
 	return Catalog.Format(msgs.locale, "recordStarted", nil)
 }
+
+// RecordStoppedEarly says "The film was stopped before it began"
+// in the language the app shows.
+func RecordStoppedEarly() string { return In(i18n.Locale()).RecordStoppedEarly() }
+
+// RecordStoppedEarly says "The film was stopped before it began"
+// in the language of msgs.
+func (msgs Messages) RecordStoppedEarly() string {
+	return Catalog.Format(msgs.locale, "recordStoppedEarly", nil)
+}

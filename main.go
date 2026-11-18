@@ -254,6 +254,70 @@ func trayIcon() []byte {
 // of macOS does.
 func trayIsTemplate() bool { return runtime.GOOS == "darwin" }
 
+// filmGlyph draws the icon of a film in the tray: the red dot a recorder
+// shows while it records, with the square of a stop button in it, which says
+// what a click does, ringed so that the dot reads on the light panel and on
+// the dark one. A panel shows it at the 16 points of an icon, which 32 pixels
+// fill on a display of two pixels a point.
+func filmGlyph() []byte {
+	const size = 32
+	img := image.NewNRGBA(image.Rect(0, 0, size, size))
+	const dot, ring = 13.8, 15.4
+	red := color.NRGBA{R: 0xff, G: 0x3b, B: 0x30, A: 0xff}
+	rim := color.NRGBA{R: 0x18, G: 0x18, B: 0x1c, A: 0x88}
+	centre := float64(size) / 2
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			d := math.Hypot(float64(x)+0.5-centre, float64(y)+0.5-centre)
+			// The edge of the dot covers the pixel as much of it as lies
+			// inside, which leaves the circle round at any size.
+			if a := clamp(float64(dot) + 0.5 - d); a > 0 {
+				img.SetNRGBA(x, y, scale(red, a))
+				continue
+			}
+			if a := clamp(float64(ring) + 0.5 - d); a > 0 {
+				img.SetNRGBA(x, y, scale(rim, a))
+			}
+		}
+	}
+	// The square of the stop button sits in the middle of the dot, as wide
+	// as the dot leaves it room.
+	const side = 12
+	left, top := centre-side/2, centre-side/2
+	white := color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			wx := clamp(math.Min(float64(x)+1, left+side) - math.Max(float64(x), left))
+			wy := clamp(math.Min(float64(y)+1, top+side) - math.Max(float64(y), top))
+			if a := wx * wy; a > 0 {
+				img.SetNRGBA(x, y, mix(red, white, a))
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		logf("tray icon: %v", err)
+		return nil
+	}
+	return buf.Bytes()
+}
+
+// mix returns a at a of the way to b, which draws one over the other where
+// both cover the pixel as much as a.
+func mix(a, b color.NRGBA, alpha float64) color.NRGBA {
+	at := func(x, y uint8) uint8 { return uint8(float64(x)*(1-alpha) + float64(y)*alpha) }
+	return color.NRGBA{R: at(a.R, b.R), G: at(a.G, b.G), B: at(a.B, b.B), A: at(a.A, b.A)}
+}
+
+// clamp keeps the coverage of a pixel between none of it and all of it.
+func clamp(a float64) float64 { return math.Min(math.Max(a, 0), 1) }
+
+// scale returns c with its alpha as far as alpha takes it.
+func scale(c color.NRGBA, alpha float64) color.NRGBA {
+	c.A = uint8(float64(c.A) * alpha)
+	return c
+}
+
 // trayGlyph draws the menu bar item: the corner brackets and dot of the app
 // icon, as heavy as the icons macOS draws there. mygo shows the image at the
 // 18 points of a menu bar, which 36 pixels fill on a Retina display.
@@ -758,40 +822,71 @@ func recordScreen(o options) error {
 		// balloon.
 		defer record.Unmark()
 	}
-	rec, err := film(o)
-	if err != nil {
-		return err
-	}
-	if o.detached {
-		notify(locales.RecordStarted(), "")
-	}
 	// The key that started the film stops it with SIGUSR1, which no app quits
 	// on: an interrupt quits mygo's event loop, and the notification that
-	// says where the film went is no notification then.
+	// says where the film went is no notification then. It is heard from
+	// here, before the picker of the desktop asks what to film, where a
+	// press would end the process otherwise.
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, stopSignals...)
 	defer signal.Stop(stop)
+
+	// The tray goes up before the film does, as the area the user picks and
+	// the screen the desktop shares hold a film back: its click ends the
+	// film, or the launch that has not started one yet.
+	fromTray := make(chan struct{}, 1)
+	var tray *mygo.Tray
+	if o.detached && runtime.GOOS == "linux" {
+		tray = filmTray(func() {
+			logf("record: the tray stops the film")
+			select {
+			case fromTray <- struct{}{}:
+			default:
+			}
+		})
+	}
+	defer func() {
+		if tray != nil {
+			tray.Destroy()
+		}
+	}()
+
+	rec, stopped, err := beginFilm(o, stop, fromTray)
+	if stopped {
+		// The key, or the tray, came before the film did: it says so, as a
+		// launch that goes quietly looks like one that filmed nothing.
+		logf("record: stopped before it filmed")
+		if o.detached {
+			notify(locales.RecordStoppedEarly(), "")
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
 	select {
 	case <-rec.Done():
 		logf("record: the recorder ended by itself")
 	case <-stop:
 		logf("record: stopping")
+	case <-fromTray:
+		logf("record: stopping from the tray")
 	}
 	path, err := rec.Stop()
+	if tray != nil {
+		tray.Destroy()
+		tray = nil
+	}
 	logf("record: stopped, path=%q err=%v", path, err)
 	if err != nil {
 		return err
 	}
 	if o.detached {
 		record.Settled(path)
+		// The notification says where the film went, and it is shown before
+		// the launch goes: an app that quits at once would take it along.
 		filmSaved(path)
-		// The notification says where the film went, and its click opens
-		// the folder: the launch keeps running for it, as Linux hands the
-		// click to the app that showed the notification.
-		select {
-		case <-filmClick:
-		case <-time.After(filmNoteWait):
-		}
 		return nil
 	}
 	fmt.Println(path)
@@ -843,14 +938,6 @@ func toggleRecording(o options) error {
 // click on it opens the folder the film is in.
 const filmNote = "film"
 
-// filmNoteWait is how long a launch that filmed keeps running for a click on
-// that notification: Linux hands the click to a process that runs, and the
-// launch quits once the film is written.
-const filmNoteWait = 20 * time.Second
-
-// filmClick is told when the user clicks the notification of a film.
-var filmClick = make(chan struct{}, 1)
-
 // filmPath is where the last film went.
 var filmPath struct {
 	sync.Mutex
@@ -885,15 +972,12 @@ func watchFilmNote() {
 		}
 		logf("film note clicked: %s", path)
 		reveal(path)
-		select {
-		case filmClick <- struct{}{}:
-		default:
-		}
 	})
 }
 
 // filmSaved says where a film went, in a notification whose click opens the
-// folder it is in.
+// folder it is in. It is shown before the call returns: a launch that goes at
+// once, as the tray stopped one does, would take the notification with it.
 func filmSaved(path string) {
 	rememberFilm(path)
 	note := mygo.NewNotification(mygo.NotificationOptions{
@@ -901,21 +985,63 @@ func filmSaved(path string) {
 		Title: locales.RecordSaved(),
 		Body:  path,
 	})
-	go func() {
-		if err := note.Show(); err != nil {
-			logf("notify: %v", err)
-		}
-	}()
+	if err := note.Show(); err != nil {
+		logf("notify: %v", err)
+	}
 }
 
-// notify shows a balloon, for a launch that has no window to say it in.
+// beginFilm starts what o films, and stops waiting for it where the key that
+// started the film comes first: the launch goes, and the picker of the
+// desktop with it.
+func beginFilm(o options, stop <-chan os.Signal, fromTray <-chan struct{}) (rec *record.Recorder, stopped bool, err error) {
+	type made struct {
+		rec *record.Recorder
+		err error
+	}
+	madeCh := make(chan made, 1)
+	go func() {
+		r, err := film(o)
+		madeCh <- made{r, err}
+	}()
+	select {
+	case <-stop:
+		return nil, true, nil
+	case <-fromTray:
+		return nil, true, nil
+	case m := <-madeCh:
+		return m.rec, false, m.err
+	}
+}
+
+// filmTray puts an icon in the tray while a film that a key started runs: a
+// click on it ends the film, which the key that started it also does, but a
+// button is easier to find than a key.
+func filmTray(stop func()) *mygo.Tray {
+	tray, err := mygo.NewTray(mygo.TrayOptions{
+		ID:      "film",
+		Icon:    filmGlyph(),
+		ToolTip: locales.TrayRecordingTip(),
+		Menu: mygo.NewMenu([]*mygo.MenuItem{
+			{Label: locales.TrayStopRecord(), Click: func(*mygo.MenuItem, *mygo.Window) { stop() }},
+		}),
+	})
+	if err != nil {
+		logf("tray: %v", err)
+		return nil
+	}
+	logf("record: the tray of the film is up")
+	tray.OnClick(stop)
+	return tray
+}
+
+// notify shows a balloon, for a launch that has no window to say it in. It is
+// shown before the call returns, as a launch that says something and goes at
+// once would take the balloon with it.
 func notify(title, body string) {
 	note := mygo.NewNotification(mygo.NotificationOptions{ID: "record", Title: title, Body: body})
-	go func() {
-		if err := note.Show(); err != nil {
-			logf("notify: %v", err)
-		}
-	}()
+	if err := note.Show(); err != nil {
+		logf("notify: %v", err)
+	}
 }
 
 // film shows what to record, and returns the recording once it is rolling.
@@ -943,6 +1069,14 @@ func film(o options) (*record.Recorder, error) {
 		Seconds: o.seconds,
 		Clicks:  o.clicks,
 		Out:     o.out,
+		// The balloon says the film has begun as the recorder rolls, which
+		// the icon of the tray went up for long before: the area, the screen
+		// the desktop shares and the codec take their time.
+		Started: func() {
+			if o.detached {
+				notify(locales.RecordStarted(), "")
+			}
+		},
 	})
 }
 

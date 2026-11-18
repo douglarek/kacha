@@ -185,6 +185,9 @@ func start(o Options, gst string, c encoder, shared *share) (*Recorder, error) {
 	}
 	exited := make(chan error, 1)
 	go func() { exited <- cmd.Wait() }()
+	if o.Started != nil {
+		o.Started()
+	}
 	select {
 	case err := <-exited:
 		os.Remove(file)

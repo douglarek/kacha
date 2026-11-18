@@ -32,6 +32,9 @@ type Options struct {
 	// Out names the file to write, a file or a directory, empty for the
 	// folder the captures go to.
 	Out string
+	// Started, when set, runs as the recorder rolls: what a caller says of a
+	// film that has begun, before the recorder is known to be working.
+	Started func()
 }
 
 // Logf, when set, records what the recorder could not do the way it meant

@@ -55,5 +55,6 @@
   "settingsRecordShortcutHint": "按下开始录制，再按一次结束。",
   "trayRecordingTip": "Kacha · 录制中，点一下停止",
   "trayStopRecord": "停止录制",
-  "recordStarted": "录制中，再按一次快捷键停止"
+  "recordStarted": "录制中，再按一次快捷键停止",
+  "recordStoppedEarly": "录制在开始前被停止了"
 }

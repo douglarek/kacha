@@ -108,5 +108,6 @@
   "recordStarted": "Recording: run the key again to stop",
   "@recordStarted": {
     "description": "The balloon a recording started from a shortcut shows."
-  }
+  },
+  "recordStoppedEarly": "The film was stopped before it began"
 }

@@ -37,6 +37,9 @@ func Start(o Options) (*Recorder, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("kacha: record: %w", err)
 	}
+	if o.Started != nil {
+		o.Started()
+	}
 	go func() {
 		defer close(r.done)
 		if err := cmd.Wait(); err != nil {

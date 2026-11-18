@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"image"
+	"image/png"
 	"strings"
 	"testing"
 
@@ -53,6 +55,28 @@ func TestRememberingWhereAFilmWent(t *testing.T) {
 	rememberFilm("/home/me/Shots/film.mp4")
 	if got := lastFilm(); got != "/home/me/Shots/film.mp4" {
 		t.Errorf("last film = %q, want the one just made", got)
+	}
+}
+
+func TestFilmGlyphIsARedDot(t *testing.T) {
+	img, err := png.Decode(bytes.NewReader(filmGlyph()))
+	if err != nil {
+		t.Fatalf("the icon of a film is no PNG: %v", err)
+	}
+	if got := img.Bounds().Dx(); got != 32 {
+		t.Errorf("the icon is %d pixels wide, want the 32 of a panel icon", got)
+	}
+	// A red dot, which is what a recorder shows, with the white square of the
+	// stop button in it.
+	if r, g, b, a := img.At(16, 7).RGBA(); a == 0 || r>>8 < 200 || g>>8 > 100 || b>>8 > 100 {
+		t.Errorf("the dot is %v, want the red of a recording", img.At(16, 7))
+	}
+	if r, g, b, _ := img.At(16, 16).RGBA(); r>>8 < 200 || g>>8 < 200 || b>>8 < 200 {
+		t.Errorf("the middle is %v, want the white square of a stop", img.At(16, 16))
+	}
+	// And nothing at the corner, as the icon of a panel has no background.
+	if _, _, _, a := img.At(0, 0).RGBA(); a != 0 {
+		t.Errorf("the corner is drawn, want it clear")
 	}
 }
 
