@@ -43,19 +43,26 @@ func StopFilming(pid int) (string, error) {
 		return "", fmt.Errorf("kacha: stop recording: %w", err)
 	}
 	Logf("record: stop: asked %d to end its film", pid)
+	// The film says where it went before it goes, and that is what the key
+	// waits for: a process that outlives the film, or one that is gone but
+	// not yet reaped, holds no film back.
 	for deadline := time.Now().Add(stopWait); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		if path := readPath(); path != "" {
+			ClearState()
+			return path, nil
+		}
 		if !alive(pid) {
 			break
 		}
 	}
-	if alive(pid) {
-		// The film is still there, and the key that stops it has not given
-		// up on it: a press again asks once more.
-		Logf("record: stop: %d went on filming", pid)
-		return "", fmt.Errorf("kacha: the film of %d did not end", pid)
-	}
 	path := readPath()
 	ClearState()
+	if path == "" {
+		// The film is still there, and the key that stops it has not given
+		// up on it: a press again asks once more.
+		Logf("record: stop: %d wrote no film", pid)
+		return "", fmt.Errorf("kacha: the film of %d did not end", pid)
+	}
 	return path, nil
 }
 

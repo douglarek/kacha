@@ -856,9 +856,7 @@ func recordScreen(o options) error {
 		// The key, or the tray, came before the film did: it says so, as a
 		// launch that goes quietly looks like one that filmed nothing.
 		logf("record: stopped before it filmed")
-		if o.detached {
-			notify(locales.RecordStoppedEarly(), "")
-		}
+		notify(locales.RecordStoppedEarly(), "")
 		return nil
 	}
 	if err != nil {
@@ -884,12 +882,15 @@ func recordScreen(o options) error {
 	}
 	if o.detached {
 		record.Settled(path)
-		// The notification says where the film went, and it is shown before
-		// the launch goes: an app that quits at once would take it along.
-		filmSaved(path)
-		return nil
 	}
-	fmt.Println(path)
+	// The notification says where the film went, and it is shown before the
+	// launch goes: an app that quits at once would take it along. A film a
+	// terminal made says it there as well, as a launch may have no terminal
+	// to read.
+	filmSaved(path)
+	if !o.detached {
+		fmt.Println(path)
+	}
 	return nil
 }
 
