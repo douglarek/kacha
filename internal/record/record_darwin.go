@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/douglarek/kacha/internal/shot"
 )
@@ -32,6 +33,9 @@ func Start(o Options) (*Recorder, error) {
 	}
 	args := append([]string{"-x"}, flags(o)...)
 	cmd := exec.Command("screencapture", append(args, raw)...)
+	// A group of its own, as a key of the terminal sends SIGINT to the group
+	// of kacha, and the recorder ends the film itself, on a stop.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	r := &Recorder{cmd: cmd, path: path, done: make(chan struct{})}
 	cmd.Stderr = &r.said
 	if err := cmd.Start(); err != nil {

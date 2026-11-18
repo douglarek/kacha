@@ -10,6 +10,10 @@ import (
 	"os/exec"
 )
 
+// ErrDenied reports that the user turned the film down, at the picker of the
+// desktop or at the question of the system.
+var ErrDenied = errors.New("kacha: record: the film was turned down")
+
 // ErrUnsupported reports that no recorder is here to film the screen: macOS
 // films with screencapture, and a Wayland session through the portal of its
 // desktop, whose stream GStreamer records.

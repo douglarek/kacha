@@ -35,10 +35,6 @@ const (
 // which the packages of kacha install as kacha.desktop.
 const appID = "kacha"
 
-// ErrDenied reports that the user turned the film down, at the picker of the
-// desktop.
-var ErrDenied = errors.New("kacha: record: the film was turned down")
-
 // share is what the desktop shares with the recorder: a PipeWire stream, the
 // size of its frames, and the connection it is read on.
 type share struct {

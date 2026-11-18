@@ -450,6 +450,12 @@ func gui(o options) error {
 		return resident(o)
 	}
 	watchFilmNote()
+	if o.cmd == "record" {
+		// MyGo quits on an interrupt, and a film must say where it went
+		// before it goes: the film hears the key itself, and quits the app
+		// once the film is written.
+		signal.Ignore(os.Interrupt)
+	}
 	errs := make(chan error, 1)
 	mygo.App.WhenReady(func() {
 		go func() {
@@ -862,6 +868,11 @@ func recordScreen(o options) error {
 		return nil
 	}
 	if err != nil {
+		// A film the desktop turned down says so in a balloon: a launch with
+		// no terminal would go quietly, as if it had never asked.
+		if errors.Is(err, record.ErrDenied) {
+			notify(locales.RecordStoppedEarly(), "")
+		}
 		return err
 	}
 
@@ -1076,15 +1087,14 @@ func film(o options) (*record.Recorder, error) {
 		// the icon of the tray went up for long before: the area, the screen
 		// the desktop shares and the codec take their time.
 		Started: func() {
-			switch {
-			case !o.detached:
-			case runtime.GOOS == "linux":
-				// The icon of the film says where it can be stopped, which
-				// the key that started it no longer is alone.
+			// A film says it began from either launch, and a Wayland session
+			// names the icon of the film as the way to end it, which the key
+			// that started it no longer is alone.
+			if runtime.GOOS == "linux" {
 				notify(locales.RecordStartedTray(), "")
-			default:
-				notify(locales.RecordStarted(), "")
+				return
 			}
+			notify(locales.RecordStarted(), "")
 		},
 	})
 }

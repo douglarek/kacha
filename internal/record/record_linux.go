@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/douglarek/kacha/internal/shot"
@@ -175,6 +176,9 @@ func start(o Options, gst string, c encoder, shared *share) (*Recorder, error) {
 		return nil, fmt.Errorf("kacha: record: %w", err)
 	}
 	cmd := exec.Command(gst, pipeline(shared.node, shared.size, o, c, file)...)
+	// A group of its own, as a key of the terminal sends SIGINT to the group
+	// of kacha, and the recorder ends the film itself, on a stop.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	// The connection to the stream reaches the recorder as the third
 	// descriptor of the process, which pipewiresrc opens it by.
 	cmd.ExtraFiles = []*os.File{shared.conn}

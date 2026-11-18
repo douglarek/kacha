@@ -57,13 +57,20 @@ func StopFilming(pid int) (string, error) {
 	}
 	path := readPath()
 	ClearState()
-	if path == "" {
+	if path != "" {
+		return path, nil
+	}
+	if alive(pid) {
 		// The film is still there, and the key that stops it has not given
 		// up on it: a press again asks once more.
-		Logf("record: stop: %d wrote no film", pid)
+		Logf("record: stop: %d went on filming", pid)
 		return "", fmt.Errorf("kacha: the film of %d did not end", pid)
 	}
-	return path, nil
+	// The film went before it wrote one, as a film whose area or screen was
+	// never picked does: it says so in its own balloon, and the key that
+	// stopped it has nothing to print.
+	Logf("record: stop: %d wrote no film", pid)
+	return "", nil
 }
 
 // Detach starts the app exe with args in a session of its own, so that the key
