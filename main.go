@@ -472,13 +472,14 @@ func resident(o options) error {
 	// The film being made, if any, and the menu bar item that makes one and
 	// stops it: a film runs until the menu stops it, or the app quits.
 	var (
-		filmMu      sync.Mutex
-		filmNow     *record.Recorder
-		bar         *mygo.Tray
-		startRecord func()
-		stopRecord  func()
-		shortcuts   func()
-		apply       func(settings.Settings)
+		filmMu       sync.Mutex
+		filmNow      *record.Recorder
+		bar          *mygo.Tray
+		startRecord  func()
+		stopRecord   func()
+		toggleRecord func()
+		shortcuts    func()
+		apply        func(settings.Settings)
 		// offClick drops the listener the icon has while a film is made.
 		offClick func()
 	)
@@ -546,19 +547,18 @@ func resident(o options) error {
 			}
 		}()
 	}
-	// shortcuts registers what the keys do now: a capture always takes one,
-	// and a film takes its own while it is being made, so that a stop need
-	// not go through the menu bar that shows in the film.
+	// shortcuts registers what the keys do now: a capture takes one, and a
+	// film takes the other, which starts a film and ends it.
 	shortcuts = func() {
 		mygo.GlobalShortcut.UnregisterAll()
 		if err := mygo.GlobalShortcut.Register(prefs.Shortcut, capture); err != nil {
 			logf("shortcut %s: %v", prefs.Shortcut, err)
 		}
-		if filming() == nil || prefs.StopShortcut == "" {
+		if prefs.RecordShortcut == "" {
 			return
 		}
-		if err := mygo.GlobalShortcut.Register(prefs.StopShortcut, stopRecord); err != nil {
-			logf("shortcut %s to stop: %v", prefs.StopShortcut, err)
+		if err := mygo.GlobalShortcut.Register(prefs.RecordShortcut, toggleRecord); err != nil {
+			logf("shortcut %s to record: %v", prefs.RecordShortcut, err)
 		}
 	}
 	startRecord = func() {
@@ -601,6 +601,13 @@ func resident(o options) error {
 		if rec := filming(); rec != nil {
 			go func() { _, _ = rec.Stop() }()
 		}
+	}
+	toggleRecord = func() {
+		if filming() != nil {
+			stopRecord()
+			return
+		}
+		startRecord()
 	}
 	apply = func(s settings.Settings) {
 		prefs = s

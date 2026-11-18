@@ -556,32 +556,32 @@ func (msgs Messages) RecordSaved() string {
 	return Catalog.Format(msgs.locale, "recordSaved", nil)
 }
 
-// SettingsStopShortcut says "Stop recording"
+// SettingsRecordShortcut says "Recording shortcut"
 // in the language the app shows.
 //
-// The title of the row that picks the shortcut ending a film.
-func SettingsStopShortcut() string { return In(i18n.Locale()).SettingsStopShortcut() }
+// The title of the row that picks the shortcut starting and ending a film.
+func SettingsRecordShortcut() string { return In(i18n.Locale()).SettingsRecordShortcut() }
 
-// SettingsStopShortcut says "Stop recording"
+// SettingsRecordShortcut says "Recording shortcut"
 // in the language of msgs.
 //
-// The title of the row that picks the shortcut ending a film.
-func (msgs Messages) SettingsStopShortcut() string {
-	return Catalog.Format(msgs.locale, "settingsStopShortcut", nil)
+// The title of the row that picks the shortcut starting and ending a film.
+func (msgs Messages) SettingsRecordShortcut() string {
+	return Catalog.Format(msgs.locale, "settingsRecordShortcut", nil)
 }
 
-// SettingsStopShortcutHint says "Press it while a film is being made, and the menu bar need not show in it."
+// SettingsRecordShortcutHint says "Press it to start a film, and again to end it."
 // in the language the app shows.
 //
-// The line under the stop recording shortcut.
-func SettingsStopShortcutHint() string { return In(i18n.Locale()).SettingsStopShortcutHint() }
+// The line under the recording shortcut.
+func SettingsRecordShortcutHint() string { return In(i18n.Locale()).SettingsRecordShortcutHint() }
 
-// SettingsStopShortcutHint says "Press it while a film is being made, and the menu bar need not show in it."
+// SettingsRecordShortcutHint says "Press it to start a film, and again to end it."
 // in the language of msgs.
 //
-// The line under the stop recording shortcut.
-func (msgs Messages) SettingsStopShortcutHint() string {
-	return Catalog.Format(msgs.locale, "settingsStopShortcutHint", nil)
+// The line under the recording shortcut.
+func (msgs Messages) SettingsRecordShortcutHint() string {
+	return Catalog.Format(msgs.locale, "settingsRecordShortcutHint", nil)
 }
 
 // TrayRecordingTip says "Kacha · recording, click to stop"

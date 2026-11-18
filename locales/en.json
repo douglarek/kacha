@@ -92,13 +92,13 @@
   },
   "recordFailed": "Kacha could not record the screen",
   "recordSaved": "Recording saved",
-  "settingsStopShortcut": "Stop recording",
-  "@settingsStopShortcut": {
-    "description": "The title of the row that picks the shortcut ending a film."
+  "settingsRecordShortcut": "Recording shortcut",
+  "@settingsRecordShortcut": {
+    "description": "The title of the row that picks the shortcut starting and ending a film."
   },
-  "settingsStopShortcutHint": "Press it while a film is being made, and the menu bar need not show in it.",
-  "@settingsStopShortcutHint": {
-    "description": "The line under the stop recording shortcut."
+  "settingsRecordShortcutHint": "Press it to start a film, and again to end it.",
+  "@settingsRecordShortcutHint": {
+    "description": "The line under the recording shortcut."
   },
   "trayRecordingTip": "Kacha · recording, click to stop",
   "@trayRecordingTip": {

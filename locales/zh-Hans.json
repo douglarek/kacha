@@ -51,8 +51,8 @@
   "recordHint": "拖拽选区开始录制 · Esc 取消",
   "recordFailed": "Kacha 无法录制屏幕",
   "recordSaved": "录制已保存",
-  "settingsStopShortcut": "停止录制快捷键",
-  "settingsStopShortcutHint": "录制时按下就结束，不用碰菜单栏。",
+  "settingsRecordShortcut": "录制快捷键",
+  "settingsRecordShortcutHint": "按下开始录制，再按一次结束。",
   "trayRecordingTip": "Kacha · 录制中，点一下停止",
   "trayStopRecord": "停止录制",
   "recordStarted": "录制中，再按一次快捷键停止"

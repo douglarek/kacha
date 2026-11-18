@@ -27,7 +27,7 @@ var (
 	mu    sync.Mutex
 	win   *mygo.Window
 	value Settings
-	// picking is the shortcut the field takes keys for, "capture" or "stop",
+	// picking is the shortcut the field takes keys for, "capture" or "record",
 	// and empty while it takes none.
 	picking   string
 	stopWatch func()
@@ -90,12 +90,12 @@ func view(c *ui.Context) {
 				shortcutField(c, t, "capture")
 			})
 			divider(c, t)
-			hint = locales.SettingsStopShortcutHint()
-			if picking == "stop" {
+			hint = locales.SettingsRecordShortcutHint()
+			if picking == "record" {
 				hint = locales.SettingsPressKeysHint()
 			}
-			row(c, t, locales.SettingsStopShortcut(), hint, func() {
-				shortcutField(c, t, "stop")
+			row(c, t, locales.SettingsRecordShortcut(), hint, func() {
+				shortcutField(c, t, "record")
 			})
 			divider(c, t)
 			row(c, t, locales.SettingsCheckUpdates(), locales.SettingsCheckUpdatesHint(), func() {
@@ -208,8 +208,8 @@ func pick(combo string, escape bool) bool {
 
 // setShortcut puts an accelerator where the shortcut it is for lives.
 func setShortcut(which, combo string) {
-	if which == "stop" {
-		value.StopShortcut = combo
+	if which == "record" {
+		value.RecordShortcut = combo
 		return
 	}
 	value.Shortcut = combo
@@ -217,8 +217,8 @@ func setShortcut(which, combo string) {
 
 // shortcutOf returns the accelerator the settings hold for which.
 func shortcutOf(which string) string {
-	if which == "stop" {
-		return value.StopShortcut
+	if which == "record" {
+		return value.RecordShortcut
 	}
 	return value.Shortcut
 }
@@ -226,10 +226,10 @@ func shortcutOf(which string) string {
 // taken reports whether the other shortcut already holds combo, which one
 // key cannot do two things at once for.
 func taken(combo string) bool {
-	if picking == "stop" {
+	if picking == "record" {
 		return combo == value.Shortcut
 	}
-	return combo == value.StopShortcut
+	return combo == value.RecordShortcut
 }
 
 // valid tells whether combo has the modifier a global shortcut needs, and a

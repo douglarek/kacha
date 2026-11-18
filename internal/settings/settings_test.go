@@ -14,14 +14,14 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if got.Shortcut != DefaultShortcut {
 		t.Errorf("shortcut = %q, want %q", got.Shortcut, DefaultShortcut)
 	}
-	if got.StopShortcut != DefaultStopShortcut {
-		t.Errorf("stop shortcut = %q, want %q", got.StopShortcut, DefaultStopShortcut)
+	if got.RecordShortcut != DefaultRecordShortcut {
+		t.Errorf("record shortcut = %q, want %q", got.RecordShortcut, DefaultRecordShortcut)
 	}
 	if got.LaunchAtLogin {
 		t.Error("a fresh install opens at login")
 	}
 
-	want := Settings{Shortcut: "CmdOrCtrl+Alt+K", StopShortcut: "CmdOrCtrl+Alt+J", LaunchAtLogin: true}
+	want := Settings{Shortcut: "CmdOrCtrl+Alt+K", RecordShortcut: "CmdOrCtrl+Alt+J", LaunchAtLogin: true}
 	if err := Save(want); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestPickTakesTheCombination(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("APPDATA", t.TempDir())
-	value = Settings{Shortcut: DefaultShortcut, StopShortcut: DefaultStopShortcut}
+	value = Settings{Shortcut: DefaultShortcut, RecordShortcut: DefaultRecordShortcut}
 	picking = "capture"
 	onApply = nil
 
@@ -84,7 +84,7 @@ func TestPickKeepsTheShortcutOnEscape(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("APPDATA", t.TempDir())
-	value = Settings{Shortcut: DefaultShortcut, StopShortcut: DefaultStopShortcut}
+	value = Settings{Shortcut: DefaultShortcut, RecordShortcut: DefaultRecordShortcut}
 	picking = "capture"
 	onApply = nil
 
@@ -99,24 +99,24 @@ func TestPickKeepsTheShortcutOnEscape(t *testing.T) {
 	}
 }
 
-// TestPickSetsTheStopShortcut covers the second field, which ends a film.
-func TestPickSetsTheStopShortcut(t *testing.T) {
+// TestPickSetsTheRecordShortcut covers the second field, which films.
+func TestPickSetsTheRecordShortcut(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("APPDATA", t.TempDir())
-	value = Settings{Shortcut: DefaultShortcut, StopShortcut: DefaultStopShortcut}
-	picking = "stop"
+	value = Settings{Shortcut: DefaultShortcut, RecordShortcut: DefaultRecordShortcut}
+	picking = "record"
 	onApply = nil
 
 	// The shortcut of a capture is the one thing the stop key cannot be.
 	if pick(DefaultShortcut, false) {
-		t.Error("the stop shortcut took the one of the capture")
+		t.Error("the recording shortcut took the one of the capture")
 	}
 	if !pick("CmdOrCtrl+Shift+K", false) {
 		t.Fatal("a combination was not taken")
 	}
-	if want := "CmdOrCtrl+Shift+K"; value.StopShortcut != want {
-		t.Errorf("stop shortcut = %q, want %q", value.StopShortcut, want)
+	if want := "CmdOrCtrl+Shift+K"; value.RecordShortcut != want {
+		t.Errorf("record shortcut = %q, want %q", value.RecordShortcut, want)
 	}
 	if value.Shortcut != DefaultShortcut {
 		t.Errorf("capture shortcut = %q, want it as it was", value.Shortcut)
