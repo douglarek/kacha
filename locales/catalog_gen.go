@@ -622,6 +622,16 @@ func (msgs Messages) RecordStarted() string {
 	return Catalog.Format(msgs.locale, "recordStarted", nil)
 }
 
+// RecordStartedTray says "Recording: press the key again, or click the icon in the tray, to stop"
+// in the language the app shows.
+func RecordStartedTray() string { return In(i18n.Locale()).RecordStartedTray() }
+
+// RecordStartedTray says "Recording: press the key again, or click the icon in the tray, to stop"
+// in the language of msgs.
+func (msgs Messages) RecordStartedTray() string {
+	return Catalog.Format(msgs.locale, "recordStartedTray", nil)
+}
+
 // RecordStoppedEarly says "The film was stopped before it began"
 // in the language the app shows.
 func RecordStoppedEarly() string { return In(i18n.Locale()).RecordStoppedEarly() }

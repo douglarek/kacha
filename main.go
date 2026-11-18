@@ -1076,7 +1076,13 @@ func film(o options) (*record.Recorder, error) {
 		// the icon of the tray went up for long before: the area, the screen
 		// the desktop shares and the codec take their time.
 		Started: func() {
-			if o.detached {
+			switch {
+			case !o.detached:
+			case runtime.GOOS == "linux":
+				// The icon of the film says where it can be stopped, which
+				// the key that started it no longer is alone.
+				notify(locales.RecordStartedTray(), "")
+			default:
 				notify(locales.RecordStarted(), "")
 			}
 		},

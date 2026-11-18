@@ -106,6 +106,7 @@
   },
   "trayStopRecord": "Stop recording",
   "recordStarted": "Recording: run the key again to stop",
+  "recordStartedTray": "Recording: press the key again, or click the icon in the tray, to stop",
   "@recordStarted": {
     "description": "The balloon a recording started from a shortcut shows."
   },
