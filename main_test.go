@@ -58,6 +58,13 @@ func TestRememberingWhereAFilmWent(t *testing.T) {
 	}
 }
 
+func TestFilmNoteNamesTheFilm(t *testing.T) {
+	got := strings.Join(filmNoteArgs("/home/me/Shots/a b.mp4"), " ")
+	if want := "film-note --film /home/me/Shots/a b.mp4"; got != want {
+		t.Errorf("args = %q, want %q", got, want)
+	}
+}
+
 func TestFilmGlyphIsARedDot(t *testing.T) {
 	img, err := png.Decode(bytes.NewReader(filmGlyph()))
 	if err != nil {

@@ -125,6 +125,9 @@ type options struct {
 	// own.
 	toggle   bool
 	detached bool
+	// film is the file a film went to, for the launch that says so in a
+	// notification.
+	film string
 }
 
 func run(args []string) error {
@@ -176,6 +179,7 @@ func run(args []string) error {
 	fs.BoolVar(&o.clicks, "clicks", true, "mark the pointer's clicks in a recording")
 	fs.BoolVar(&o.toggle, "toggle", false, "start a recording, or stop the one running")
 	fs.BoolVar(&o.detached, "detached", false, "the recording a toggle started")
+	fs.StringVar(&o.film, "film", "", "the file a film went to, for the notification of one")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -184,6 +188,10 @@ func run(args []string) error {
 	})
 	switch o.cmd {
 	case "region", "full", "record":
+	case "film-note":
+		if o.film == "" {
+			return errors.New("kacha: film-note takes --film")
+		}
 	case "area":
 		if o.area == "" {
 			return errors.New("kacha: area takes X,Y,WxH")
@@ -467,8 +475,11 @@ func gui(o options) error {
 				}
 			}()
 			take := shoot
-			if o.cmd == "record" {
+			switch o.cmd {
+			case "record":
 				take = recordScreen
+			case "film-note":
+				take = filmNote
 			}
 			err := take(o)
 			if err != nil {
@@ -743,9 +754,16 @@ func reveal(path string) {
 // opens the folder it is in where it does not.
 func showInFileManager(path string) error {
 	if err := exec.Command("gdbus", showItemsArgs(path)...).Run(); err == nil {
+		logf("reveal: the file manager was asked for %s", path)
 		return nil
+	} else {
+		logf("reveal: gdbus: %v", err)
 	}
-	return exec.Command("xdg-open", filepath.Dir(path)).Run()
+	err := exec.Command("xdg-open", filepath.Dir(path)).Run()
+	if err == nil {
+		logf("reveal: xdg-open opened %s", filepath.Dir(path))
+	}
+	return err
 }
 
 // showItemsArgs returns the call of org.freedesktop.FileManager1.ShowItems
@@ -896,11 +914,11 @@ func recordScreen(o options) error {
 	if o.detached {
 		record.Settled(path)
 	}
-	// The notification says where the film went, and it is shown before the
-	// launch goes: an app that quits at once would take it along. A film a
-	// terminal made says it there as well, as a launch may have no terminal
-	// to read.
-	filmSaved(path)
+	// The notification says where the film went, in a launch that outlives
+	// this one for the click of it: a launch that goes at once takes its
+	// notification along, and answers no click. A film a terminal made says
+	// it there as well, as a launch may have no terminal to read.
+	sayFilm(path)
 	if !o.detached {
 		fmt.Println(path)
 	}
@@ -948,11 +966,11 @@ func toggleRecording(o options) error {
 	return err
 }
 
-// filmNote is the ID of the notification that says where a film went: a
+// filmNoteID is the ID of the notification that says where a film went: a
 // click on it opens the folder the film is in.
-const filmNote = "film"
+const filmNoteID = "film"
 
-// filmPath is where the last film went.
+// filmPath is where the last film went, and when its balloon was shown.
 var filmPath struct {
 	sync.Mutex
 	path string
@@ -977,31 +995,81 @@ func lastFilm() string {
 // of an earlier launch arrives then.
 func watchFilmNote() {
 	mygo.App.OnNotificationClick(func(id string) {
-		if id != filmNote {
+		if id != filmNoteID {
 			return
 		}
 		path := lastFilm()
 		if path == "" {
 			return
 		}
-		logf("film note clicked: %s", path)
+		// The desktop of COSMIC acts on a notification as it shows it, and no
+		// signal tells that apart from a click: both open the folder, which
+		// is what either asks for.
+		logf("film note: the folder of %s is asked for", path)
 		reveal(path)
 	})
+}
+
+// filmNoteWait is how long the launch that shows where a film went keeps
+// running for a click on that notification: Linux hands the click to a
+// process that runs, and the film's own launch goes at once. It is the time
+// a balloon is on the screen, and a little more.
+const filmNoteWait = time.Minute
+
+// filmNote shows where a film went, and opens the folder it is in when the
+// user clicks the notification. It is a launch of its own, so that the film
+// goes at once: on Linux a click reaches the app that showed the
+// notification, and that app is this one.
+func filmNote(o options) error {
+	// The click arrives through the watch of the app, which shows the folder.
+	// The launch stays the whole while, as the desktop may act on the balloon
+	// itself, and a click after that is a click all the same.
+	filmSaved(o.film)
+	time.Sleep(filmNoteWait)
+	return nil
+}
+
+// sayFilm hands where a film went to a launch of its own, which shows the
+// notification and answers its click, and shows it here where that launch
+// cannot be made.
+func sayFilm(path string) {
+	exe, err := os.Executable()
+	if err != nil {
+		filmSaved(path)
+		return
+	}
+	cmd := exec.Command(exe, filmNoteArgs(path)...)
+	ownSession(cmd)
+	cmd.Stdout, cmd.Stderr = nil, nil
+	if err := cmd.Start(); err != nil {
+		logf("film note: %v", err)
+		filmSaved(path)
+		return
+	}
+	_ = cmd.Process.Release()
+}
+
+// filmNoteArgs returns what the launch that says where a film went is
+// started with.
+func filmNoteArgs(path string) []string {
+	return []string{"film-note", "--film", path}
 }
 
 // filmSaved says where a film went, in a notification whose click opens the
 // folder it is in. It is shown before the call returns: a launch that goes at
 // once, as the tray stopped one does, would take the notification with it.
-func filmSaved(path string) {
+func filmSaved(path string) *mygo.Notification {
 	rememberFilm(path)
 	note := mygo.NewNotification(mygo.NotificationOptions{
-		ID:    filmNote,
+		ID:    filmNoteID,
 		Title: locales.RecordSaved(),
 		Body:  path,
 	})
 	if err := note.Show(); err != nil {
 		logf("notify: %v", err)
+		return nil
 	}
+	return note
 }
 
 // beginFilm starts what o films, and stops waiting for it where the key that
