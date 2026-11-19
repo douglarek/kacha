@@ -14,7 +14,7 @@
   "out": "dist",
   "linux": {
     "maintainer": "Leo Douglas <douglarek@gmail.com>",
-    "comment": "Capture the screen, annotate it, and copy it to the clipboard",
+    "comment": "Capture the screen, annotate it, and copy it or film it",
     "categories": [
       "Graphics",
       "Utility"
@@ -24,17 +24,14 @@
     "depends": {
       "deb": [
         "wl-clipboard",
-        "wf-recorder",
         "xdg-desktop-portal"
       ],
       "rpm": [
         "wl-clipboard",
-        "wf-recorder",
         "xdg-desktop-portal"
       ],
       "arch": [
         "wl-clipboard",
-        "wf-recorder",
         "xdg-desktop-portal"
       ]
     }
